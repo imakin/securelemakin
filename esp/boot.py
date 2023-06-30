@@ -5,7 +5,9 @@ import time
 
 expected_lib = ['base64.mpy', 'binascii.mpy', 'hmac.mpy', 'struct.mpy']
 
-if os.listdir('/lib')!=expected_lib:
+try:
+    assert(os.listdir('/lib')==expected_lib)
+except:
     import libinstall
 
 
