@@ -1,7 +1,6 @@
 is_micro = True
 try:
     #for esp8266 micropython
-    import machine
     import cryptolib
     import gc as garbage_collector
 except ModuleNotFoundError:

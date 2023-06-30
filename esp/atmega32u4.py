@@ -1,11 +1,4 @@
-import os
-from machine import (
-    Pin,
-    unique_id,
-    I2C,
-    UART,
-    # ~ ADC,
-)
+from os import listdir
 import time
 import socket
 import gc
@@ -18,6 +11,18 @@ print(gc.mem_free())
 import enc
 import secret
 import data_manager
+import display
+
+from machine import (
+    Pin,
+    unique_id,
+    I2C,
+    UART,
+    ADC,
+)
+gc.collect()
+print(gc.mem_free())
+
 
 ledpin = Pin(2,Pin.OUT)
 def led(on_or_off):
@@ -39,9 +44,6 @@ class keyboard(object):
     def off():
         keyboard.keyboard_echo_pin.value(0)
     
-
-# ~ adc = ADC(0)
-# ~ adc_threshold = 20 #when adc pin untouched, usually value is <8
 
 
 
@@ -144,7 +146,7 @@ class CommandManager(object):
         keyboard.off()#32u4 only check pin on the begining of i2c data, so it's safe to off() while 32u4 is still receiving
 
     def cmd_list(self,nothing):
-        files = ";".join(os.listdir('/data'))
+        files = ";".join(listdir('/data'))
         print(f"sending to 32u4: {files}")
         self.ctx.html = files
         
@@ -192,6 +194,10 @@ class Routine(object):
 
         self.address = 1 #atmega32u4 self.address
         self.i2c = I2C(sda=Pin(4),scl=Pin(5))
+        
+        self.adc = ADC(0)
+        self.adc_threshold_trigger_in = 1000 #u16
+        # ~ self.adc_threshold_trigger_out = 448 #u16
         sampling = 0
         
         self.command_manager = CommandManager()
@@ -232,17 +238,11 @@ class Routine(object):
                 break
             
             
-            #ADC & web server routine
-            # ~ if adc.read()>adc_threshold:
-                # ~ print("adc touched, web server mode")
-                # ~ led("toggle")
-                # ~ self.server.settimeout(1)
-                # ~ while adc.read()>adc_threshold:
+            #web server routine
             led("toggle")
             havent_tried = True
             while havent_tried or (time.time()-self.server_last_connection)<1:
                 havent_tried = False
-                self.html = ""
                 try:
                     conn, requesteraddr = self.server.accept()
                 except:
@@ -269,7 +269,68 @@ class Routine(object):
                 else:
                     conn.sendall(self.html_help)
                 conn.close()
+                self.html = ""
+                gc.collect()
                 
+            
+            
+            #button operation
+            #ADC and display routine
+            crawl_mode = False
+            file_list = None
+            file_pos  = 0 #postion in the file_list
+            while True:
+                adc = self.read_adc_blocking()
+                if adc<self.adc_threshold_trigger_in:
+                    time.sleep(1)
+                    if self.read_adc_blocking()<self.adc_threshold_trigger_in:
+                        break;
+                else:
+                    time.sleep(0.5)
+
+                crawl_mode = True
+                gc.collect()
+                if file_list is None:
+                    file_list = listdir(data_manager.DATA_DIR)
+                try:
+                    current_file = file_list[file_pos]
+                except IndexError:
+                    file_pos = 0
+                    current_file = file_list[file_pos]
+                display.lcd.fill(0)#clear
+                display.lcd.text(current_file,0,0,1)
+                display.lcd.show()
+                display.lcd.text(str(file_pos),0,4*14,1)
+                display.lcd.show()
+                
+                file_pos += 1
+                
+            if crawl_mode:
+                file_pos -= 1
+                filename = file_list[file_pos]
+                file_list = None
+                gc.collect()
+                command = "cmd_print"
+                if filename.startswith('otp_'):
+                    command = "cmd_otp"
+                command = f"{command} {filename}"
+                display.lcd.text(command,0,26,1)
+                display.lcd.show()
+                self.command_manager.process(command)
+            file_list = None
+            gc.collect()
+            
+            display.lcd.fill(1)#clear
+            display.lcd.text("Securelemakin",0,0,0)#clear
+            display.lcd.show()
+            
+    
+    def read_adc_blocking(self,sampling=8):        
+        adc = 0
+        for i in range(sampling):
+            adc += self.adc.read_u16()
+            time.sleep(0.05)
+        return adc//sampling
 try:
     Routine()
 except KeyboardInterrupt: #so that pyboard --no-soft-reset can do file upload

@@ -1,10 +1,12 @@
-import base64
-import hashlib
+from base64 import b32decode
+from hashlib import sha1
 import hmac
 
-import ntptime
-import time
+from ntptime import settime as ntptime_settime
+from time import mktime,localtime
 import gc
+
+gc.collect()
 
 class OTP(object):
     """
@@ -19,7 +21,7 @@ class OTP(object):
         self.digits = digits
         if digits > 10:
             raise ValueError("digits must be no greater than 10")
-        self.digest = hashlib.sha1
+        self.digest = sha1
         self.secret = s
 
     def generate_otp(self, input_: int) -> str:
@@ -46,7 +48,7 @@ class OTP(object):
         missing_padding = len(secret) % 8
         if missing_padding != 0:
             secret += "=" * (8 - missing_padding)
-        return base64.b32decode(secret, casefold=True)
+        return b32decode(secret, casefold=True)
 
     @staticmethod
     def int_to_bytestring(i: int, padding: int = 8) -> bytes:
@@ -85,10 +87,10 @@ def epoch_2000_to_1970(s):
 
 def now(secretcode):
     aku = OTP(secretcode)
-    ntptime.settime()
+    ntptime_settime()
     hasil =  aku.generate_otp(
         int(
-            epoch_2000_to_1970(time.mktime(time.localtime()))
+            epoch_2000_to_1970(mktime(localtime()))
             //30 #TOTP timestep
         )
     )
