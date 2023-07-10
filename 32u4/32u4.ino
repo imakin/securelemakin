@@ -14,54 +14,62 @@ char* password;
 int passwordlen;
 #define passwordmaxlen 64
 
-char* command = array(uint8_t,128);
+#define commandmaxlen 128
 int commandlen = 0;
 
-class WireSend{
+#define button_a_in A0
+#define button_a_out A2
+#define button_b_in 9
+#define button_b_out 11
+
+unsigned long var_uint64;
+
+class CommandManager{
     public:
         char* data;
-        int length;
-        int pos;
-        bool is_sending = false;
-        bool free_on_done = false;//if true, after all *data sent, free(data) will be called
-        
-        WireSend(){};
-        
-        void send(int length, char* data, bool free_data_after_done){
-            this->data = data;
-            this->length = length;
-            this->pos = 0;
-            this->is_sending = false;
-            this->free_on_done = free_data_after_done;
+        int pos_fill; //position of data to be filled
+        int pos_sent; //position of data that has been sent
+        int is_sending;
+        CommandManager(){
+            data = array(char,commandmaxlen);
+            pos_fill = 0;
+            pos_sent = 0;
+            is_sending = false;
         }
-        
-        bool send_available(){
-            if (pos >= length) {
-                is_sending = false;
-                length = 0;
-                if (free_on_done) {
-                    free(data);
+        void clear(){
+            data[0] = 0;
+            pos_fill = 0;
+            pos_sent = 0;
+            is_sending = false;
+        }
+        bool is_clear(){
+            if (data[0]==0) {
+                return true;
+            }
+            return false;
+        }
+        bool send_next(int repeat){
+            if (data[pos_sent]!=0 && pos_sent<commandmaxlen){
+                for (int i=0;i<repeat;i++){
+                    Wire.write(data[pos_sent]);
                 }
-                return false;
+                pos_sent += 1;
+                return true;
             }
-            return true;
+            clear();
+            Serial.println("cmd reset");
+            return false;
         }
-        
-        bool send_next_char(){
-            if (!is_sending){
-                return false;
+        bool append(char n){
+            if (pos_fill<commandmaxlen){
+                data[pos_fill] = n;
+                pos_fill += 1;
+                return true;
             }
-            if (!send_available()){
-                return false;
-            }
-            Wire.write(data[pos]);
-            //~ Serial.print(" s:");
-            //~ Serial.print(data[pos]);
-            pos += 1;
-            return send_available();
+            return false;
         }
 };
-WireSend wiresend;
+CommandManager cmd;
 
 void setup(){
     pinMode(keyboard_echo_flag_pin, INPUT);
@@ -72,35 +80,68 @@ void setup(){
     Serial.println("ok0");
     //~ Serial1.println("ok1");
     Keyboard.begin();
-    Wire.begin(1);//address=1 as slave, leonardo (D2 SDA), (D3 SCL). on esp: (D2 GPIO4 SDA) (D1 GPIO5 SCL)
+    Wire.begin(100);//address=1 as slave, leonardo (D2 SDA), (D3 SCL). on esp: (D2 GPIO4 SDA) (D1 GPIO5 SCL)
+    Wire.setClock(100000);
+    cmd.clear();
     Wire.onReceive(wireOnReceive);
     Wire.onRequest(wireOnRequest);
+    pinMode(button_a_out,OUTPUT);
+    pinMode(button_b_out,OUTPUT);
+    digitalWrite(button_a_out,LOW);
+    digitalWrite(button_b_out,LOW);
+    
+    //~ DDRB = DDRB | 0b01000000;
+    //~ PORTB = PORTB & 0b10111111;
+    
+    pinMode(button_a_in,INPUT_PULLUP);
+    pinMode(button_b_in,INPUT_PULLUP);
+    
 }
 
 
 void loop() {
-    uint8_t chr;
-    if (Serial.available()>0) {
-        chr = (uint8_t)Serial.read();
-        
-        if (chr=='\n') {
-            //line reading is done
-            //will send data on the next ping from esp, 
-            wiresend.send(commandlen,command,false);//asynchronous sending
-            Serial.println("wiresend initialized");
-            Serial.println(wiresend.length);
-            commandlen = 0;
-        }
-        else {
-            command[commandlen] = chr;
-            commandlen += 1;
-        }
+    char chr;
+    //~ commandlen = 0;
+    bool ngisi = false;
+    while (Serial.available()>0){
+        chr = (char)Serial.read();
+        while (cmd.is_sending);
+        cmd.append(chr);
+        ngisi = true;
+    }
+    if (ngisi) {
+        cmd.append(0);
+        Serial.print("pos_fill: ");
+        Serial.println(cmd.pos_fill);
     }
     
-    if (text_set){
-        Serial.println(text);
-        text = "";
-        text_set = false;
+    //button routine
+    char button_value = 0;
+    if (digitalRead(button_a_in)==LOW){
+        var_uint64 = millis();
+        while (digitalRead(button_a_in)==LOW);
+        if ((millis()-var_uint64)>1000) {
+            button_value = 'C';
+        }
+        else {
+            button_value = 'A';
+        }
+    }
+    if (digitalRead(button_b_in)==LOW){
+        var_uint64 = millis();
+        while (digitalRead(button_b_in)==LOW);
+        if ((millis()-var_uint64)>1000) {
+            button_value = 'C';
+        }
+        else {
+            button_value = 'B';
+        }
+    }
+    if (button_value!=0){
+        cmd.append('B');
+        cmd.append(button_value);
+        cmd.append(10);
+        cmd.append(0);
     }
 }
 
@@ -108,12 +149,8 @@ void loop() {
  * esp8266 only has 1 usable full duplex tx rx already used by python repl. use wire instead.
  * unfortunately the esp8266 micropython only support master mode wire, so 32u4 will act as slave/peripheral
  * 
- * esp will ping request and 32u4 will answer with 1 byte variable (wiresend.length).
- * (wiresend.length) is the length of data that needs to be transmitted by 32u4
- * (wiresend.length) = 0 if 32u4 has nothing to transmit
- * (wiresend.length) > 0 if 32u4 has something to transmit,
- *      if previously sent data from wireOnRequest has (wiresend.length)>0, esp will request data again and
- *      the next wireOnRequest event will just send the data with length (wiresend.length)
+ * esp will read 128 byte and 32u4 will send data waiting in the queue.
+ * data can be filled from USB-HOST 
  * 
  * secure data is stored in esp8266
  * keyboard USB HID and usb interface is handled by 32u4
@@ -145,19 +182,12 @@ bool is_printable(char c){
 }
 
 void wireOnRequest(){
-    if (wiresend.is_sending){
-        //send the data
-        while(wiresend.send_next_char());
-    }
-    else {
-        Wire.write(wiresend.length);
-        //will send data on next wireOnRequest
-        if (wiresend.length>0){
-            Serial.print(wiresend.length);
-            Serial.println(" begin sending data to esp");
-            wiresend.is_sending = true;
-        }
-    }
+    cmd.is_sending = true;
+    cmd.send_next(1);
+    //~ for (int i =0;i<32;i++){
+        //~ cmd.send_next(1);
+    //~ }
+    cmd.is_sending = false;
 }
 
 void wireOnReceive(int received_length){
@@ -166,8 +196,8 @@ void wireOnReceive(int received_length){
         //check one and keep the flag even if pin is changing mid i2c data transfer
         keyboardmode = true;
     }
-    text = "";
-    bool text_set = false;
+    //~ text = "";
+    //~ bool text_set = false;
     while (Wire.available()) {
         char c = Wire.read();
         if (keyboardmode) {
@@ -180,12 +210,13 @@ void wireOnReceive(int received_length){
         }
         else {
             //flag pin is not high, echo back to USB-Host
-            text += c;
-            text_set = true;
+            //~ text += c;
+            //~ text_set = true;
+            Serial.write(c);
         }
     }
-    Serial.print("received: ");
-    Serial.println(received_length);
+    //~ Serial.print("received: ");
+    //~ Serial.println(received_length);
 }
 
 

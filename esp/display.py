@@ -1,4 +1,5 @@
-from machine import Pin,I2C
+from machine import Pin
+from machine import SoftI2C as I2C
 import ssd1306
 
 gnd = Pin(13,Pin.OUT)
@@ -14,3 +15,9 @@ i2c = I2C(sda=sda,scl=scl)
 lcd = ssd1306.SSD1306_I2C(128,64,i2c)
 lcd.text("Securelemakin",0,0,1)
 lcd.show()
+
+class Lock:
+    def __init__(self):
+        self.locked = False
+
+lock = Lock() #display locked flag

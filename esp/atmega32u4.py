@@ -1,27 +1,52 @@
 from os import listdir
-import time
+from time import sleep as time_sleep
+from time import time as time_time
 import socket
 import gc
 
-gc.collect()
-print(gc.mem_free())
 import totp
 gc.collect()
-print(gc.mem_free())
 import enc
 import secret
+print(gc.mem_free())
+gc.collect()
+print(gc.mem_free())
 import data_manager
 import display
 
 from machine import (
     Pin,
     unique_id,
-    I2C,
     UART,
     ADC,
 )
+from machine import SoftI2C as I2C
 gc.collect()
 print(gc.mem_free())
+
+
+last_printed = ""
+def ngeprint(s,force_display=False):
+    s = f"{s}"
+    print(s)
+    global last_printed
+    if s!=last_printed:
+        last_printed = s
+        print(s)
+        if force_display==False and display.lock.locked: #respect display lock
+            return
+        
+        display.lcd.fill(0)
+        line = 0
+        while len(s)>0:
+            sub = s[:16]
+            display.lcd.text(sub,0,line*12,1)
+            s = s[16:]
+            line += 1
+        display.lcd.show()
+
+
+
 
 
 ledpin = Pin(2,Pin.OUT)
@@ -36,14 +61,14 @@ def led(on_or_off):
 
 
 class keyboard(object):
-    keyboard_echo_pin = Pin(15,Pin.OUT)
+    echo_pin = Pin(15,Pin.OUT)
     @staticmethod
     def on():
-        keyboard.keyboard_echo_pin.value(1)
+        keyboard.echo_pin.value(1)
     @staticmethod
     def off():
-        keyboard.keyboard_echo_pin.value(0)
-    
+        keyboard.echo_pin.value(0)
+
 
 
 
@@ -91,7 +116,7 @@ class Password(object):
             f.write(b)
             self.cipher = bytearray(b)
             gc.collect()
-            
+
 
 
 
@@ -104,37 +129,57 @@ class CommandManager(object):
         if command_manager!=None:
             raise Exception("command_manager singleton already instantiated")
         self.password = Password(enc, secret.Password.prime, secret.Password.salt)
-    
+        self.data_keys = data_manager.get_data_keys()
+        self.data_pos = 0 #position in self.data_keys for button mode
+        self.button_mode_timer = 0
+
     def set_context(self,ctx):
         self.ctx = ctx
-    
+
     def singleton(self):
         global command_manager
         if command_manager==None:
             command_manager = CommandManager()
         return command_manager
-    
+
     def cmd_print(self,securedata_name):
         b = bytearray(data_manager.get_data(securedata_name))
         s = enc.bytearray_strip(
             enc.decrypt(b,self.password.get())
         )
+        print(s)
         keyboard.on()
-        self.ctx.i2c.writeto(self.ctx.address,s.encode('utf8'))
+        while len(s)>0:
+            #dont forget our i2c cant send more than 42 bytes at once
+            self.ctx.i2c.writeto(self.ctx.address,s[:32].encode('utf8'))
+            s = s[32:]
+            time_sleep(0.25)
         keyboard.off()#32u4 only check pin on the begining of i2c data, so it's safe to off() while 32u4 is still receiving
+        # ~ time_sleep(0.5)
+        self.ctx.i2c.stop()
+        print("[OK]")
 
     """
-    do keyboard print for chr(char_byte)
+    do keyboard ngeprint for chr(char_byte)
     usefull for one key charracter or keyboard like 32 (space) 10 (linefeed) 9(tab)
     """
     def cmd_print_char(self,char_byte):
+        if char_byte=="ENTER":
+            char_byte = '\n'
+        if char_byte=="TAB":
+            char_byte = '\t'
         keyboard.on()
-        self.ctx.i2c.writeto(self.ctx.address,bytes([int(char_byte)]))
+        self.ctx.i2c.writeto(self.ctx.address,bytes([ord(char_byte)]))
         keyboard.off()#32u4 only check pin on the begining of i2c data, so it's safe to off() while 32u4 is still receiving
+
+    def cmd_sleep(self,seconds_in_byte):
+        self.cmd_delay(seconds_in_byte)
+    def cmd_delay(self,seconds_in_byte):
+        time_sleep(ord(seconds_in_byte))
 
     def cmd_password(self,password):
         self.password.set(password)
-    
+
     def cmd_otp(self,securedata_name):
         b = bytearray(data_manager.get_data(securedata_name))
         s = enc.bytearray_strip(
@@ -147,9 +192,31 @@ class CommandManager(object):
 
     def cmd_list(self,nothing):
         files = ";".join(listdir('/data'))
-        print(f"sending to 32u4: {files}")
+        ngeprint(f"sending to 32u4: {files}")
         self.ctx.html = files
-        
+
+    def button_mode(self,message):
+        self.button_mode_timer = time_time()
+        display.lock.locked = True
+        ngeprint(f"buttonmode: {message}")
+        if (message=="BB"):
+            self.data_pos -= 1
+            if self.data_pos<0:
+                self.data_pos = len(self.data_keys)-1
+        elif message=="BA":
+            self.data_pos += 1
+            if self.data_pos>=len(self.data_keys):
+                self.data_pos = 0
+        elif message=="BC":
+            key = self.data_keys[self.data_pos]
+            command = "cmd_print"
+            if key.startswith("otp_"):
+                command = "cmd_otp"
+            self.process(f"{command} {key}")
+            ngeprint(f"{self.data_keys[self.data_pos]} executed",force_display=True)
+            return
+                
+        ngeprint(self.data_keys[self.data_pos],force_display=True)
 
     """
     data_message examples:
@@ -159,25 +226,36 @@ class CommandManager(object):
     first word is method in this class
     """
     def process(self,data_message):
+        if display.lock.locked and time_time()-self.button_mode_timer>5:
+            display.lock.locked = False
+        
         if type(data_message) in [bytes,bytearray]:
             m = data_message.decode('utf8')
         elif type(data_message)==str:
             m = data_message
         else:
             raise ValueError("parameter data_message must be str,bytes,or bytearray")
+        
+        if m in ["BA","BB","BC"]:
+            self.button_mode(m)
+            return
+        
         try:
             first_space = m.find(' ')
+            if first_space<0:
+                ngeprint("no space, not executed but throws no error")
+                return
             cmd = m[:first_space]
             param = m[first_space+1:]
-            print(cmd)
-            print(param)
+            ngeprint(f"(def process) command: {cmd} param: {param}")
             if cmd.startswith('cmd_'):
                 getattr(self,cmd)(param)
+                ngeprint("[OK]")
             else:
                 raise ValueError('malformed...')
         except Exception as e:
             raise e
-            # ~ print(e)
+            # ~ ngeprint(e)
             # ~ raise ValueError(f"malformed data {m}")
 
 class Routine(object):
@@ -188,67 +266,107 @@ class Routine(object):
         self.server.bind(['',80])
         self.server.listen()
         self.server.settimeout(0.5)
-        self.server_last_connection = time.time()
-        
+        self.server_last_connection = time_time()
+
         self.uart = UART(0,baudrate=115200,timeout=500)
 
-        self.address = 1 #atmega32u4 self.address
-        self.i2c = I2C(sda=Pin(4),scl=Pin(5))
-        
+        self.address = 100 #atmega32u4 self.address
+        self.i2c = I2C(sda=Pin(4),scl=Pin(5),freq=100000)
+
         self.adc = ADC(0)
-        self.adc_threshold_trigger_in = 1000 #u16
+        self.adc_threshold_trigger_in = 800 #u16
         # ~ self.adc_threshold_trigger_out = 448 #u16
         sampling = 0
-        
+
+        self.last_wrong_command = b''
+
         self.command_manager = CommandManager()
         self.command_manager.set_context(self)
+
+        display.lcd.fill(1)#clear
+        display.lcd.text("Securelemakin",0,0,0)#clear
+        display.lcd.show()
         
+
         keyboard.off()
         led(1)
+        readings = bytearray(128)
+        for x in range(128):readings[x]=0
         while True:
             #self.i2c routine
             try:
-                expecting_length_b = self.i2c.readfrom(self.address, 1)
-                if len(expecting_length_b):
-                    l = int(expecting_length_b[0])
-                    print(f"got data from 32u4 {l}")
-                    if (l>0):
-                        data = self.i2c.readfrom(self.address, l)
-                        if len(data)>0:
-                            print(f"received {type(data)}: {data}")
-                            try:
-                                self.command_manager.process(data)
-                            except Exception as e:
-                                print("wrong command")
-                                print(e)
+                readings[0] = 0
+                p = 0
+                print("waiting i2c")
+                while True:
+                    # ~ self.i2c.start()
+                    newreads = self.i2c.readfrom(self.address, 1)
+                    # ~ self.i2c.stop()
+                    if newreads[0]==0 or newreads[0]==0xff:
+                        break
+                    readings[p] = newreads[0]
+                    p+=1
+                    if p>=128:
+                        break
+                    time_sleep(0.01)
+                l = 0
+                r = 1
+                if readings[0]==0:
+                    raise OSError("no data")
+                while True:
+                    while readings[r]!=ord('\n') and (r+1)<len(readings):
+                        r = r+1
+                    # ~ if r>=len(readings):
+                        # ~ r -= 1
+                    try:
+                        if (r-l<100):
+                            ngeprint(f"partial: BEGIN {readings[l:r]} END")
+                        self.command_manager.process(readings[l:r])
+                        self.last_wrong_command = b''
+                    except Exception as e:
+                        wrong_command = self.bytearray_rstrip(readings)
+                        ngeprint(f"{e} wrong command {wrong_command}")
+                        # ~ if wrong_command != self.last_wrong_command:
+                            # ~ ngeprint(f"wrong command {wrong_command}")
+                            # ~ ngeprint(e)
+                            # ~ self.last_wrong_command = wrong_command
+                    l = r+1
+                    r += 2
+                    if r>=len(readings):
+                        break
+                print("i2c done")
             except OSError:
                 sampling += 1
                 if sampling>=10:
-                    print("no data")
+                    ngeprint("no data")
                     sampling = 0
+            finally:
+                gc.collect()
+                try:
+                    self.i2c.stop()
+                except:pass
                 
-            
             #UART routine
             serialdata = self.uart.read()
             if serialdata:
-                print("atmega32u4 routine exit because self.uart is coming")
-                print(serialdata)
+                ngeprint("atmega32u4 routine exit because self.uart is coming")
+                ngeprint(serialdata)
                 with open("lastdata.bin","wb") as f:
                     f.write(bytearray(serialdata))
                 break
-            
-            
+
+
             #web server routine
             led("toggle")
             havent_tried = True
-            while havent_tried or (time.time()-self.server_last_connection)<1:
+            while havent_tried or (time_time()-self.server_last_connection)<1:
                 havent_tried = False
                 try:
                     conn, requesteraddr = self.server.accept()
                 except:
                     led("toggle")
                     continue
-                self.server_last_connection = time.time()
+                self.server_last_connection = time_time()
                 led("toggle")
                 request_message = conn.recv(1024).decode('utf8')
                 lines = request_message.split('\r\n') #to get the first line
@@ -258,9 +376,9 @@ class Routine(object):
                 try:
                     self.command_manager.process(command)
                 except Exception as e:
-                    print(f"wrong command:\n\t{GET_path}\n\t{command}")
-                    print(e)
-                
+                    ngeprint(f"wrong command:\n\t{GET_path}\n\t{command}")
+                    ngeprint(e)
+
                 conn.send("HTTP/1.1 200 OK\r\n")
                 conn.send("Content-Type: text/html\r\n")
                 conn.send("Connection: close\r\n\r\n")
@@ -271,9 +389,9 @@ class Routine(object):
                 conn.close()
                 self.html = ""
                 gc.collect()
-                
-            
-            
+
+
+            """
             #button operation
             #ADC and display routine
             crawl_mode = False
@@ -282,11 +400,11 @@ class Routine(object):
             while True:
                 adc = self.read_adc_blocking()
                 if adc<self.adc_threshold_trigger_in:
-                    time.sleep(1)
+                    time_sleep(1)
                     if self.read_adc_blocking()<self.adc_threshold_trigger_in:
                         break;
                 else:
-                    time.sleep(0.5)
+                    time_sleep(0.5)
 
                 crawl_mode = True
                 gc.collect()
@@ -302,9 +420,9 @@ class Routine(object):
                 display.lcd.show()
                 display.lcd.text(str(file_pos),0,4*14,1)
                 display.lcd.show()
-                
+
                 file_pos += 1
-                
+
             if crawl_mode:
                 file_pos -= 1
                 filename = file_list[file_pos]
@@ -319,20 +437,32 @@ class Routine(object):
                 self.command_manager.process(command)
             file_list = None
             gc.collect()
-            
-            display.lcd.fill(1)#clear
-            display.lcd.text("Securelemakin",0,0,0)#clear
-            display.lcd.show()
-            
-    
-    def read_adc_blocking(self,sampling=8):        
+            """
+
+
+
+    def read_adc_blocking(self,sampling=8):
         adc = 0
         for i in range(sampling):
             adc += self.adc.read_u16()
-            time.sleep(0.05)
+            time_sleep(0.05)
         return adc//sampling
+
+    """
+    only return the position of the right most non gibberish char
+    """
+    def bytearray_rstrip_pos(self,buff):
+        r = len(buff)-1
+        while (r>0 and (buff[r]>127 or buff[r]==0)):
+            r -= 1
+        return r
+
+    def bytearray_rstrip(self,buff):
+        r = self.bytearray_rstrip_pos(buff)
+        return buff[:r+1]
+
 try:
     Routine()
 except KeyboardInterrupt: #so that pyboard --no-soft-reset can do file upload
     led(0)
-    print("atmega32u4 routine exits because of keyboard interrupt")
+    ngeprint("atmega32u4 routine exits because of keyboard interrupt")

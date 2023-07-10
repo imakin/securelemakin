@@ -1,12 +1,11 @@
-import os
+from os import listdir
 
 import wificonnect
-import time
 
 expected_lib = ['base64.mpy', 'binascii.mpy', 'hmac.mpy', 'struct.mpy']
 
 try:
-    assert(os.listdir('/lib')==expected_lib)
+    assert(listdir('/lib')==expected_lib)
 except:
     import libinstall
 
@@ -14,6 +13,8 @@ except:
 def readfile(filename):
     with open(filename) as f:
         return f.read()
-
+def gccollect():
+    from gc import collect
+    gc.collect()
 #main app
 import atmega32u4

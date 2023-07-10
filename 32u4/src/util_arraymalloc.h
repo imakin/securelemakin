@@ -1,1 +1,1 @@
-../../lib/util_arraymalloc.h
+../../reusable/util_arraymalloc.h

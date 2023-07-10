@@ -3,4 +3,4 @@ data.bin
 data.bin.bak
 secret.py
 data/*
-
+*.mpy
