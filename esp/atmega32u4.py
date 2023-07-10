@@ -194,6 +194,32 @@ class CommandManager(object):
         files = ";".join(listdir('/data'))
         ngeprint(f"sending to 32u4: {files}")
         self.ctx.html = files
+    
+    """
+    message_and_password is message and password separated by ;;;
+    in format:
+        [securedataname];;;[message][;;;][password];;;["overwrite"(optional)]
+    example:
+        mysecretfile;;;my secret string;;;p@55vv0rd                 #will not overwrite
+        mysecretfile;;;my secret string;;;p@55vv0rd;;;overwrite     #will overwrite
+    """
+    def cmd_encrypt(self,message_and_password):
+        try:
+            data = message_and_password.split(";;;")
+            overwrite = False
+            if len(data)>4 and data[3]=="overwrite":
+                overwrite = True
+            else:
+                self.data_keys = data_manager.get_data_keys()
+                if data[0] in self.data_keys:
+                    ngeprint(f"overwrite disabled, and file exist. skipping {data[0]}")
+            chip = enc.encrypt(data[1],data[2])
+            with open(f"{data_manager.DATA_DIR}/{data[0]}","wb") as f:
+                f.write(chip)
+                ngeprint("cmd_encrypt [OK]")
+        except:
+            ngeprint(f"encrypt wrong format {message_and_password} should be 'securedataname;;;my secret string;;;p@55vv0rd;;;overwrite' ")
+            pass
 
     def button_mode(self,message):
         self.button_mode_timer = time_time()
@@ -368,6 +394,7 @@ class Routine(object):
                     continue
                 self.server_last_connection = time_time()
                 led("toggle")
+                gc.collect()
                 request_message = conn.recv(1024).decode('utf8')
                 lines = request_message.split('\r\n') #to get the first line
                 GET_path = lines[0].split(' ')[1] #to get the 2nd word from the first line
@@ -466,3 +493,5 @@ try:
 except KeyboardInterrupt: #so that pyboard --no-soft-reset can do file upload
     led(0)
     ngeprint("atmega32u4 routine exits because of keyboard interrupt")
+except MemoryError:
+    ngeprint("MEMORY ERROR! press hardware Reset")
