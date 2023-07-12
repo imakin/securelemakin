@@ -78,9 +78,15 @@ def kirim(inputs, delay=0, debug=True):
 
 
 if __name__=="__main__":
-    device = sys.argv[1]
+    if sys.argv[1].startswith('/dev/'):
+        device = sys.argv[1]
+        inputs = sys.argv[2:]
+    else:
+        #default port
+        device = [d for d in os.listdir('/dev/') if (d.startswith('ttyACM') or d.startswith('tty.usbmodem'))][0]
+        device = f"/dev/{device}"
+        inputs = sys.argv[1:]
     ser = serial.Serial(port=device, baudrate=115200,timeout=3)
-    inputs = sys.argv[2:]
     if (len(inputs)<1):
         if DEBUG:print("send all arguments through serial, valid byte number will be send as is, anything else will be send each charracter as byte ")
         if DEBUG:print("example `python serialsender.py /dev/tty.usbserial-* 254 aaaaa 10`")
