@@ -28,7 +28,6 @@ print(gc.mem_free())
 last_printed = ""
 def ngeprint(s,force_display=False):
     s = f"{s}"
-    print(s)
     global last_printed
     if s!=last_printed:
         last_printed = s
@@ -69,7 +68,10 @@ class keyboard(object):
     def off():
         keyboard.echo_pin.value(0)
 
-
+class CONST:
+    PR_BUTTON_MODE = 1
+    PR_OK = 0
+    PR_ERROR = -1
 
 
 class Password(object):
@@ -102,9 +104,9 @@ class Password(object):
                 self.exist = True
                 temp = bytearray(self.cipher)
                 return self.enc.bytearray_strip(self.enc.decrypt(temp,self.password_passkey))
-            except:
+            except Exception as e:
                 self.exist = False
-                raise Exception('password not set')
+                raise Exception(f'password not set {e}')
             finally:
                 try:f.close()
                 except:pass
@@ -261,22 +263,25 @@ class CommandManager(object):
             m = data_message
         else:
             raise ValueError("parameter data_message must be str,bytes,or bytearray")
+        data_message = None
+        gc.collect()
         
         if m in ["BA","BB","BC"]:
             self.button_mode(m)
-            return
+            return CONST.PR_BUTTON_MODE
         
         try:
             first_space = m.find(' ')
             if first_space<0:
                 ngeprint("no space, not executed but throws no error")
-                return
+                return CONST.PR_ERROR
             cmd = m[:first_space]
             param = m[first_space+1:]
             ngeprint(f"(def process) command: {cmd} param: {param}")
             if cmd.startswith('cmd_'):
                 getattr(self,cmd)(param)
                 ngeprint("[OK]")
+                return CONST.PR_OK
             else:
                 raise ValueError('malformed...')
         except Exception as e:
@@ -316,55 +321,53 @@ class Routine(object):
 
         keyboard.off()
         led(1)
-        readings = bytearray(128)
-        for x in range(128):readings[x]=0
+        readings = bytearray(64)
+        for x in range(len(readings)):readings[x]=0
         while True:
             #self.i2c routine
             try:
                 readings[0] = 0
                 p = 0
-                print("waiting i2c")
                 while True:
-                    # ~ self.i2c.start()
                     newreads = self.i2c.readfrom(self.address, 1)
-                    # ~ self.i2c.stop()
                     if newreads[0]==0 or newreads[0]==0xff:
                         break
                     readings[p] = newreads[0]
                     p+=1
-                    if p>=128:
+                    if p>=len(readings):
                         break
                     time_sleep(0.01)
-                l = 0
-                r = 1
                 if readings[0]==0:
                     raise OSError("no data")
+                process_return = 0
+                print(readings)
+                l = 0
+                r = 1
+                non_gibberish_end = self.bytearray_rstrip_pos(readings)
                 while True:
-                    while readings[r]!=ord('\n') and (r+1)<len(readings):
+                    while readings[r]!=ord('\n'):
                         r = r+1
-                    # ~ if r>=len(readings):
-                        # ~ r -= 1
+                        if r>non_gibberish_end:
+                            break
                     try:
                         if (r-l<100):
                             ngeprint(f"partial: BEGIN {readings[l:r]} END")
-                        self.command_manager.process(readings[l:r])
+                        process_return = self.command_manager.process(readings[l:r])
                         self.last_wrong_command = b''
                     except Exception as e:
                         wrong_command = self.bytearray_rstrip(readings)
                         ngeprint(f"{e} wrong command {wrong_command}")
-                        # ~ if wrong_command != self.last_wrong_command:
-                            # ~ ngeprint(f"wrong command {wrong_command}")
-                            # ~ ngeprint(e)
-                            # ~ self.last_wrong_command = wrong_command
                     l = r+1
                     r += 2
-                    if r>=len(readings):
+                    if r>non_gibberish_end:
                         break
-                print("i2c done")
+                print(f"i2c done {process_return}")
+                if process_return==CONST.PR_BUTTON_MODE:
+                    continue #straight to next loop to catch next button press
             except OSError:
                 sampling += 1
                 if sampling>=10:
-                    ngeprint("no data")
+                    # ~ ngeprint("no data")
                     sampling = 0
             finally:
                 gc.collect()
@@ -386,6 +389,7 @@ class Routine(object):
             led("toggle")
             havent_tried = True
             while havent_tried or (time_time()-self.server_last_connection)<1:
+                gc.collect()
                 havent_tried = False
                 try:
                     conn, requesteraddr = self.server.accept()
@@ -400,11 +404,19 @@ class Routine(object):
                 GET_path = lines[0].split(' ')[1] #to get the 2nd word from the first line
                 commands = GET_path.split('/')
                 command = " ".join([word for word in commands if len(word)>0])
+                request_message = None
+                lines = None
+                GET_path = None
+                commands = None
+                gc.collect()
                 try:
                     self.command_manager.process(command)
                 except Exception as e:
                     ngeprint(f"wrong command:\n\t{GET_path}\n\t{command}")
                     ngeprint(e)
+                command = None
+                gc.collect()
+                
 
                 conn.send("HTTP/1.1 200 OK\r\n")
                 conn.send("Content-Type: text/html\r\n")
@@ -416,55 +428,6 @@ class Routine(object):
                 conn.close()
                 self.html = ""
                 gc.collect()
-
-
-            """
-            #button operation
-            #ADC and display routine
-            crawl_mode = False
-            file_list = None
-            file_pos  = 0 #postion in the file_list
-            while True:
-                adc = self.read_adc_blocking()
-                if adc<self.adc_threshold_trigger_in:
-                    time_sleep(1)
-                    if self.read_adc_blocking()<self.adc_threshold_trigger_in:
-                        break;
-                else:
-                    time_sleep(0.5)
-
-                crawl_mode = True
-                gc.collect()
-                if file_list is None:
-                    file_list = listdir(data_manager.DATA_DIR)
-                try:
-                    current_file = file_list[file_pos]
-                except IndexError:
-                    file_pos = 0
-                    current_file = file_list[file_pos]
-                display.lcd.fill(0)#clear
-                display.lcd.text(current_file,0,0,1)
-                display.lcd.show()
-                display.lcd.text(str(file_pos),0,4*14,1)
-                display.lcd.show()
-
-                file_pos += 1
-
-            if crawl_mode:
-                file_pos -= 1
-                filename = file_list[file_pos]
-                file_list = None
-                gc.collect()
-                command = "cmd_print"
-                if filename.startswith('otp_'):
-                    command = "cmd_otp"
-                command = f"{command} {filename}"
-                display.lcd.text(command,0,26,1)
-                display.lcd.show()
-                self.command_manager.process(command)
-            file_list = None
-            gc.collect()
-            """
 
 
 
