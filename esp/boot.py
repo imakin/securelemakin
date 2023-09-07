@@ -17,4 +17,4 @@ def gccollect():
     from gc import collect
     gc.collect()
 #main app
-import atmega32u4
+import main

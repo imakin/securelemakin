@@ -192,32 +192,32 @@ def decrypt(bytechiper,password):
     return message
 
 
-if (not is_micro) and __name__=="__main__":
-    #test script
-    import sys
-    verbose = False
-    try:
-        assert(sys.argv[1]=='-v')
-        verbose = True
-    except (AssertionError,IndexError): pass
-    def printtest(s):
-        if verbose: print(s)
-    s = "example"
-    p1 = pad(s)
-    p2 = pad(s)
-    printtest(f"{s}\n{p1}\n{p2}")
-    try:
-        assert(p1!=p2) #differennt call should result different value
-        unpad(p1)
-        unpad(p2)
-        printtest(f"{s}\n{p1}\n{p2}")
-        assert(p1==p2)
-        assert(p1.decode('utf8').find(s)==0)
-        assert(p2.decode('utf8').find(s)==0)
-    except AssertionError as e:
-        print(s,p1,p2,sep="\n")
-        raise e
+# ~ if (not is_micro) and __name__=="__main__":
+    # ~ #test script
+    # ~ import sys
+    # ~ verbose = False
+    # ~ try:
+        # ~ assert(sys.argv[1]=='-v')
+        # ~ verbose = True
+    # ~ except (AssertionError,IndexError): pass
+    # ~ def printtest(s):
+        # ~ if verbose: print(s)
+    # ~ s = "example"
+    # ~ p1 = pad(s)
+    # ~ p2 = pad(s)
+    # ~ printtest(f"{s}\n{p1}\n{p2}")
+    # ~ try:
+        # ~ assert(p1!=p2) #differennt call should result different value
+        # ~ unpad(p1)
+        # ~ unpad(p2)
+        # ~ printtest(f"{s}\n{p1}\n{p2}")
+        # ~ assert(p1==p2)
+        # ~ assert(p1.decode('utf8').find(s)==0)
+        # ~ assert(p2.decode('utf8').find(s)==0)
+    # ~ except AssertionError as e:
+        # ~ print(s,p1,p2,sep="\n")
+        # ~ raise e
     
 
-    print(hashpassword("merkecu"))
-    print(hashpassword("merkecu",secret.Hash.prime2,secret.Hash.salt2))
+    # ~ print(hashpassword("merkecu"))
+    # ~ print(hashpassword("merkecu",secret.Hash.prime2,secret.Hash.salt2))

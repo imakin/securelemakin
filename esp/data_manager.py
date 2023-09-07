@@ -1,4 +1,5 @@
 from os import listdir,mkdir
+from gc import collect as gc_collect
 #this file will contain dict variable for secure data. fill it as necessary
 #data in get_data(data_name)
 #data can be from file in /data folder, make it lazy load to save ram
@@ -19,6 +20,9 @@ def get_data(name="")->bytes:
         try:
             f = open(f"{DATA_DIR}/{name}", 'rb')
             buff = f.read()
+            f.close()
+            f = None
+            gc_collect()
             return buff
         except OSError:
             print(f"file not found {name}")

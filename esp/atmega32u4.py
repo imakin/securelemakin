@@ -101,12 +101,18 @@ class Password(object):
             try:
                 f = open(self.password_file,'rb')
                 self.cipher = bytearray(f.read())
+                f.close()
+                f = None
+                gc.collect()
                 self.exist = True
                 temp = bytearray(self.cipher)
                 return self.enc.bytearray_strip(self.enc.decrypt(temp,self.password_passkey))
-            except Exception as e:
+            except OSError as e:
                 self.exist = False
                 raise Exception(f'password not set {e}')
+            except Exception as e:
+                self.exist = False
+                raise Exception(f'decrypting error {e}')
             finally:
                 try:f.close()
                 except:pass
@@ -337,6 +343,8 @@ class Routine(object):
                     if p>=len(readings):
                         break
                     time_sleep(0.01)
+                newreads = None
+                gc.collect()
                 if readings[0]==0:
                     raise OSError("no data")
                 process_return = 0
@@ -399,7 +407,7 @@ class Routine(object):
                 self.server_last_connection = time_time()
                 led("toggle")
                 gc.collect()
-                request_message = conn.recv(1024).decode('utf8')
+                request_message = conn.recv(256).decode('utf8')
                 lines = request_message.split('\r\n') #to get the first line
                 GET_path = lines[0].split(' ')[1] #to get the 2nd word from the first line
                 commands = GET_path.split('/')
