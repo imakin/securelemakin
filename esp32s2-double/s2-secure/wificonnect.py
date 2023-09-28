@@ -1,0 +1,11 @@
+import network
+
+wlan = network.WLAN(network.STA_IF) # create station interface
+wlan.active(True)       # activate the interface
+#wlan.scan()             # scan for access points
+print(f'connected: {wlan.isconnected()}')      # check if the station is connected to an AP
+if (not wlan.isconnected()):
+    wlan.connect('yesdata', 'ldks012789') # connect to an AP
+while not wlan.isconnected():pass
+#wlan.config('mac')      # get the interface's MAC address
+print(wlan.ifconfig())         # get the interface's IP/netmask/gw/DNS addresses
