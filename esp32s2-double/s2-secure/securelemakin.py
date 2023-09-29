@@ -335,7 +335,7 @@ class Routine(object):
 
         keyboard.off()
         led(1)
-        readings = bytearray(64)
+        readings = bytearray(256)
         for x in range(len(readings)):readings[x]=0
         while True:
             #button routine
@@ -480,6 +480,18 @@ class Routine(object):
         return buff[:r+1]
     
     def html_build(self):
+        self.html_help = """
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="utf-8" />
+                <title>Securelemakin</title>
+            """
+        
+        self.html_help += "</head>"
+        
+
+
         self.html_help +="<br/>"
         self.html_help +="<div>"
         
