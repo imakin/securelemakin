@@ -50,10 +50,13 @@ def upload(filename, mode=MODE_MPY):
     o = subprocess.check_output(cmd,shell=True)
     print(f"compiled to {newfile}")
     filename = newfile
+  else:
+    newfile = filename
   cmd = f"pyboard.py -d {device} -f cp {newfile} :{filename}"
+  print(cmd)
   o = subprocess.check_output(cmd,shell=True)
   print(o.decode('utf8'))
-  if mode==MODE_MPY:
+  if mode==MODE_MPY and newfile.endswith('.mpy') and newfile!=filename:
     print(f"removing {newfile}")
     os.unlink(f"{newfile}")
   # ~ os.unlink(f"{newfile}")

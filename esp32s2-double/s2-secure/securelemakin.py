@@ -13,6 +13,7 @@ gc.collect()
 print(gc.mem_free())
 import data_manager
 import display
+from json import dumps as json_dumps
 
 from machine import (
     Pin,
@@ -445,6 +446,8 @@ class Routine(object):
                 commands = None
                 gc.collect()
                 try:
+                    if (command.startswith('cmd_print')):
+                        time_sleep(2)
                     self.command_manager.process(command)
                 except Exception as e:
                     ngeprint(f"wrong command:\n\t{GET_path}\n\t{command}")
@@ -480,56 +483,89 @@ class Routine(object):
         return buff[:r+1]
     
     def html_build(self):
-        self.html_help = """
-            <!DOCTYPE html>
-            <html lang="en">
-            <head>
-                <meta charset="utf-8" />
-                <title>Securelemakin</title>
-            """
+        with open('html-help-head.html') as f:
+            self.html_help = f.read()
         
-        self.html_help += "</head>"
-        
+        self.html_help += "<script>"
+        self.html_help += "let data_command_list = "
+        self.html_help += json_dumps(
+            {"lis":[
+                {
+                    "attribute":"",
+                    "inner":f
+                }
+                for f in dir(self.command_manager) if f.startswith('cmd') 
+            ]}
+        )
+        self.html_help += ";"
 
-
-        self.html_help +="<br/>"
-        self.html_help +="<div>"
-        
-        self.html_help +="<h3>Command list:</h3>"
-        self.html_help +="<ul>"
-        for f in dir(self.command_manager):
-            if f.startswith('cmd'):
-                self.html_help +=f"<li>{f}</li>"
-        self.html_help +="</ul>"
-
-        self.html_help +="<h3>Data list:</h3>"
-        self.html_help +="<ul id='data-list'>"
-        print(data_manager.get_data_keys())
-        for securedata in data_manager.get_data_keys():
-            cmd = "cmd_print"
-            if securedata.startswith('otp'):
-                cmd = "cmd_otp"
-            self.html_help +=f"<li><a href='/{cmd}/{securedata}' title='execute {securedata} after 2 seconds'>{securedata}</a></li>"
-        self.html_help +="</ul>"
-        self.html_help +="<script>"
-        self.html_help +="""
-            function data_link_click(event){
-                const securedataname = event.currentTarget.innerText;
-                const securedatauri = event.currentTarget.href;
-                setTimeout(()=>{
-                    document.location = securedatauri;
-                },2000);
-                event.preventDefault();
+        self.html_help += "let data_data_list = "
+        self.html_help += json_dumps(
+            {"lis":[
+            {
+                "attribute":"class='data-link'",
+                "inner":f'<a href="/{"cmd_otp" if sec.startswith('otp_') else "cmd_print"}/{sec}">{sec}</a>'
             }
-            
-            let lis = document.querySelectorAll('#data-list li a');
-            Array.prototype.forEach.call(lis,(a)=>{
-                a.addEventListener('click',data_link_click);
-            });
-        """
-        self.html_help +="</script>"
+            for sec in data_manager.get_data_keys()
+            ]}
+        )
+        self.html_help += ";"
+        self.html_help += "</script>"
+        
 
-        self.html_help +="</div>"
+        with open('html-help-ending.html') as f:
+            self.html_help += f.read()
+    
+        # self.html_help = """
+        #     <!DOCTYPE html>
+        #     <html lang="en">
+        #     <head>
+        #         <meta charset="utf-8" />
+        #         <title>Securelemakin</title>
+        #     """
+        
+        # self.html_help += "</head>"
+        
+
+
+        # self.html_help +="<br/>"
+        # self.html_help +="<div>"
+        
+        # self.html_help +="<h3>Command list:</h3>"
+        # self.html_help +="<ul>"
+        # for f in dir(self.command_manager):
+        #     if f.startswith('cmd'):
+        #         self.html_help +=f"<li>{f}</li>"
+        # self.html_help +="</ul>"
+
+        # self.html_help +="<h3>Data list:</h3>"
+        # self.html_help +="<ul id='data-list'>"
+        # print(data_manager.get_data_keys())
+        # for securedata in data_manager.get_data_keys():
+        #     cmd = "cmd_print"
+        #     if securedata.startswith('otp'):
+        #         cmd = "cmd_otp"
+        #     self.html_help +=f"<li><a href='/{cmd}/{securedata}' title='execute {securedata} after 2 seconds'>{securedata}</a></li>"
+        # self.html_help +="</ul>"
+        # self.html_help +="<script>"
+        # self.html_help +="""
+        #     function data_link_click(event){
+        #         const securedataname = event.currentTarget.innerText;
+        #         const securedatauri = event.currentTarget.href;
+        #         setTimeout(()=>{
+        #             document.location = securedatauri;
+        #         },2000);
+        #         event.preventDefault();
+        #     }
+            
+        #     let lis = document.querySelectorAll('#data-list li a');
+        #     Array.prototype.forEach.call(lis,(a)=>{
+        #         a.addEventListener('click',data_link_click);
+        #     });
+        # """
+        # self.html_help +="</script>"
+
+        # self.html_help +="</div>"
 
 
 try:
