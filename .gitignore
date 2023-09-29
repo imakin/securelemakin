@@ -1,4 +1,11 @@
 esp32-single/
+fp-info-cache
+fp-lib-table
+*.zip
+*.lib
+*.gbrjob
+*.lck
+
 .DS_Store
 *.raw
 *.dontupload

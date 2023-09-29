@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import sys
+import time
 import os
 from PySide2.QtWidgets import (
     QApplication
@@ -33,8 +34,16 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Securelemakin GUI")
         
         self.sc = self.findChild(QWidget, "sc")
+        self.le_port = self.findChild(QLineEdit, "le_port")
+        self.le_port.setText(self.device)
         
         self.list = {}
+        
+        with open('securecombo.txt') as f:
+            for combo_line in f.read().split('\n'):
+                combo_line = combo_line.replace('\n','').replace('\r','')
+                self.make_combo(combo_line)
+                
         with open('securelist.txt') as f:
             for w in f.read().split(';'):
                 name = w.replace('\n','').replace('\r','')
@@ -44,10 +53,13 @@ class MainWindow(QMainWindow):
                 }
                 self.make_button(name)
         
-        # ~ for key in self.list:
     
     def serial_open(self):
-        self.ser = serial.Serial(port=self.device, baudrate=115200,timeout=3)
+        try:
+            self.ser = serial.Serial(port=self.le_port.text(), baudrate=115200,timeout=3)
+            self.le_port.setStyleSheet('background:green')
+        except:
+            self.le_port.setStyleSheet('background:red')
     def serial_close(self):
         self.ser.close()
     
@@ -56,16 +68,50 @@ class MainWindow(QMainWindow):
         self.sc.layout().addWidget(bt)
         bt.setText(securelem_key)
         def cb():
-            self.cmd_print(securelem_key)
+            if securelem_key.startswith('otp_'):
+                self.cmd(securelem_key,'cmd_otp')
+            else:
+                self.cmd(securelem_key,'cmd_print')
         self.list[securelem_key]["function"] = cb
         bt.clicked.connect(self.list[securelem_key]["function"])
     
-    def cmd_print(self,securelem_key):
-        command = f"cmd_delay {chr(2)}\ncmd_print {securelem_key}\n"
+    def cmd(self,securelem_key,command="cmd_print"):
+        # ~ command = f"cmd_delay {chr(2)}\n{command} {securelem_key}\n"
+        time.sleep(1.5)
+        command = f"{command} {securelem_key}\n"
         self.serial_open()
         self.ser.write(command.encode('utf8'))
         self.serial_close()
+    
+    def cmd_tab(self):
+        self.serial_open()
+        self.ser.write(f"cmd_print_char TAB\n".encode('utf8'))
+        self.serial_close()
 
+    def cmd_enter(self):
+        self.serial_open()
+        self.ser.write(f"cmd_print_char ENTER\n".encode('utf8'))
+        self.serial_close()
+    def make_combo(self,combo_line):
+        securelem_key = f"COMBO: {combo_line.replace(';','-')}"
+        self.list[securelem_key] = {}
+        self.list[securelem_key]["name"] = securelem_key
+        
+        bt = QPushButton(self.sc)
+        self.sc.layout().addWidget(bt)
+        bt.setText(securelem_key)
+        def cb():
+            for w in combo_line.split(';'):
+                print("ex",w)
+                if w=="tab":
+                    self.cmd_tab()
+                elif w=="enter":
+                    self.cmd_enter()
+                else:
+                    self.cmd(w,"cmd_print");
+                time.sleep(4)
+        self.list[securelem_key]["function"] = cb
+        bt.clicked.connect(self.list[securelem_key]["function"])
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
