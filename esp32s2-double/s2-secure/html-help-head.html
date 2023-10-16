@@ -28,7 +28,7 @@
     
     <h3>New data</h3>
     <div>
-        <form id="new-data" action="" method="GET">
+        <form id="new-data" action="" method="POST">
             <p>
                 <label>Name: <input id="new_name"/></label>
             </p>
@@ -43,35 +43,45 @@
                         type="checkbox"
                         />
                 </label>
-                <script>
-                    document.querySelector('#new_key_show').addEventListener('change',(ev)=>{
-                        let inp = document.querySelector('#new_key');
-                        if (ev.currentTarget.checked) {inp.setAttribute('type','')}
-                        else {inp.setAttribute('type',"password")}
-                        console.log(ev.currentTarget,inp.type);
-                    })
-                </script>
             </p>
             <p>
                 <label>Overwrite
                     <input id="new_overwrite" type="checkbox" />
                 </label>
             </p>
-            <button type="submit">OK</button>
+            <button type="button" id="new-data-submit">OK</button>
         </form>
         <script>
-            function formchange(ev){
-                let form = document.querySelector('#new-data');
-                let url = [
+            document.querySelector('#new_key_show').addEventListener('change',(ev)=>{
+                let inp = document.querySelector('#new_key');
+                if (ev.currentTarget.checked) {inp.setAttribute('type','')}
+                else {inp.setAttribute('type',"password")}
+                console.log(ev.currentTarget,inp.type);
+            })
+            let new_message = document.querySelector('#new_message');
+            new_message.addEventListener('focus',(ev)=>{
+                ev.currentTarget.setAttribute('type','text');
+            });
+            new_message.addEventListener('blur',(ev)=>{
+                ev.currentTarget.setAttribute('type','password');
+            });
+
+            function upload(){
+                
+                let data = [
                     document.querySelector('#new_name').value,
                     document.querySelector('#new_message').value,
                     document.querySelector('#new_key').value,
                     document.querySelector('#new_overwrite').checked?"overwrite":""
                 ].join(';;;');
-                form.action = '/cmd_encrypt/'+url;
+                fetch('/cmd_encrypt', {
+                    method: 'POST',
+                    headers: {
+                    'Content-Type': 'text/plain',
+                    },
+                    body: data
+                })
             }
-            Array.prototype.forEach.call(document.querySelectorAll('#new_name, #new_message, #new_key', '#new_overwrite'),(it)=>{
-                it.addEventListener('change',formchange)
-            })
+            document.querySelector('#new-data-submit').addEventListener('click',upload)
         </script>
     </div>

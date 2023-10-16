@@ -37,16 +37,17 @@ def ngeprint(s,force_display=False):
         print(s)
         if force_display==False and display.lock.locked: #respect display lock
             return
-        
-        display.lcd.fill(0)
-        line = 0
-        while len(s)>0:
-            sub = s[:16]
-            display.lcd.text(sub,0,line*12,1)
-            s = s[16:]
-            line += 1
-        display.lcd.show()
-
+        try:
+            display.lcd.fill(0)
+            line = 0
+            while len(s)>0:
+                sub = s[:16]
+                display.lcd.text(sub,0,line*12,1)
+                s = s[16:]
+                line += 1
+            display.lcd.show()
+        except:
+            print('[lcd error]')
 
 
 
@@ -153,12 +154,14 @@ class CommandManager(object):
             enc.decrypt(b,self.password.get())
         )
         print(s)
+        s = s.replace(r'\t','\t') #support escape sequence only for \t and \n
+        s = s.replace(r'\n','\n')
         keyboard.on()
         while len(s)>0:
             #dont forget our i2c cant send more than 42 bytes at once
             self.ctx.i2c.writeto(self.ctx.address,s[:32].encode('utf8'))
             s = s[32:]
-            time_sleep(0.25)
+            time_sleep(1)
         keyboard.off()#s2-keyboard only check pin on the begining of i2c data, so it's safe to off() while s2-keyboard is still receiving
         # ~ time_sleep(0.5)
         self.ctx.i2c.stop()
@@ -324,15 +327,12 @@ class Routine(object):
         self.bt_ok      = Pin(33,Pin.IN,Pin.PULL_UP)
 
         def btval():
+            if self.bt_ok.value()==0:return '\n'
             if self.bt_left.value()==0:return 'l'
             if self.bt_right.value()==0:return 'r'
-            if self.bt_ok.value()==0:return '\n'
             return 1
 
-        display.lcd.fill(1)#clear
-        display.lcd.text("Securelemakin",0,0,0)#clear
-        display.lcd.show()
-        
+        ngeprint('securelemakin ready')
 
         keyboard.off()
         led(1)
@@ -343,8 +343,7 @@ class Routine(object):
             timer_buttonroutine = time_time()
             while True:
                 if btval()!=1:
-                    if btval()!=1:
-                        self.command_manager.button_mode(btval())
+                    self.command_manager.button_mode(btval())
                     waiting_start = time_time()
                     while btval()!=1:
                         # wait until button released before next loop,
@@ -354,7 +353,7 @@ class Routine(object):
                             self.command_manager.button_mode(btval())
                     timer_buttonroutine = time_time()
                 
-                if (time_time()-timer_buttonroutine)>1:
+                if (time_time()-timer_buttonroutine)>2:
                     break
 
             #self.i2c routine
@@ -436,23 +435,55 @@ class Routine(object):
                 led("toggle")
                 gc.collect()
                 request_message = conn.recv(1024).decode('utf8')
+                if not request_message:
+                    continue
                 lines = request_message.split('\r\n') #to get the first line
-                GET_path = lines[0].split(' ')[1] #to get the 2nd word from the first line
-                commands = GET_path.split('/')
+                print("---lines:------")
+                print(lines)
+                print("---request_message:------")
+                print(request_message)
+                print("----------")
+                if lines and lines[0].startswith('POST'):
+                    try:
+                        conn, requesteraddr = self.server.accept()
+                        conn.sendall(b"HTTP/1.0 200 OK\r\nContent-Type: text/html")
+                        print("request again")
+                        request_message = conn.recv(1024).decode('utf8')
+                        print("2ndrecv---")
+                        print(request_message)
+                        print("----------")
+                    except:
+                        print("request again timeout")
+                
+                if lines and lines[0].startswith('GET /favicon.ico'):
+                    conn.sendall(self.html_favicon())
+                    conn.close()
+                    request_message = None
+                    lines = None
+                    GET_path = None
+                    commands = None
+                    gc.collect()
+                    continue
+                path = lines[0].split(' ')[1] #to get the 2nd word from the first line
+                commands = path.split('/')
                 command = " ".join([word for word in commands if len(word)>0])
+                if lines[0].startswith('POST'):
+                    lines = 0
+                    gc.collect()
+                    post_data_start = request_message.find('\r\n\r\n')
+                    if post_data_start>=0:
+                        command += " "+request_message[post_data_start+4:]
+                        print(f"POST executing {command}")
                 request_message = None
                 lines = None
-                GET_path = None
+                path = None
                 commands = None
                 gc.collect()
                 try:
-                    if (command.startswith('cmd_print')):
-                        time_sleep(2)
                     self.command_manager.process(command)
                 except Exception as e:
-                    ngeprint(f"wrong command:\n\t{GET_path}\n\t{command}")
+                    ngeprint(f"wrong command:\n\t{path}\n\t{command}")
                     ngeprint(e)
-                command = None
                 gc.collect()
                 
 
@@ -466,6 +497,8 @@ class Routine(object):
                 conn.close()
                 self.html = ""
                 gc.collect()
+                if (command.startswith('cmd_print')):
+                    time_sleep(2)
 
 
 
@@ -502,11 +535,11 @@ class Routine(object):
         self.html_help += "let data_data_list = "
         self.html_help += json_dumps(
             {"lis":[
-            {
-                "attribute":"class='data-link'",
-                "inner":f'<a href="/{"cmd_otp" if sec.startswith('otp_') else "cmd_print"}/{sec}">{sec}</a>'
-            }
-            for sec in data_manager.get_data_keys()
+                {
+                    "attribute":"class='data-link'",
+                    "inner":f'<a href="/{"cmd_otp" if sec.startswith('otp_') else "cmd_print"}/{sec}">{sec}</a>'
+                }
+                for sec in data_manager.get_data_keys()
             ]}
         )
         self.html_help += ";"
@@ -515,58 +548,10 @@ class Routine(object):
 
         with open('html-help-ending.html') as f:
             self.html_help += f.read()
-    
-        # self.html_help = """
-        #     <!DOCTYPE html>
-        #     <html lang="en">
-        #     <head>
-        #         <meta charset="utf-8" />
-        #         <title>Securelemakin</title>
-        #     """
-        
-        # self.html_help += "</head>"
-        
 
-
-        # self.html_help +="<br/>"
-        # self.html_help +="<div>"
-        
-        # self.html_help +="<h3>Command list:</h3>"
-        # self.html_help +="<ul>"
-        # for f in dir(self.command_manager):
-        #     if f.startswith('cmd'):
-        #         self.html_help +=f"<li>{f}</li>"
-        # self.html_help +="</ul>"
-
-        # self.html_help +="<h3>Data list:</h3>"
-        # self.html_help +="<ul id='data-list'>"
-        # print(data_manager.get_data_keys())
-        # for securedata in data_manager.get_data_keys():
-        #     cmd = "cmd_print"
-        #     if securedata.startswith('otp'):
-        #         cmd = "cmd_otp"
-        #     self.html_help +=f"<li><a href='/{cmd}/{securedata}' title='execute {securedata} after 2 seconds'>{securedata}</a></li>"
-        # self.html_help +="</ul>"
-        # self.html_help +="<script>"
-        # self.html_help +="""
-        #     function data_link_click(event){
-        #         const securedataname = event.currentTarget.innerText;
-        #         const securedatauri = event.currentTarget.href;
-        #         setTimeout(()=>{
-        #             document.location = securedatauri;
-        #         },2000);
-        #         event.preventDefault();
-        #     }
-            
-        #     let lis = document.querySelectorAll('#data-list li a');
-        #     Array.prototype.forEach.call(lis,(a)=>{
-        #         a.addEventListener('click',data_link_click);
-        #     });
-        # """
-        # self.html_help +="</script>"
-
-        # self.html_help +="</div>"
-
+    def html_favicon(self):
+        #dummy icon http message
+        return "HTTP/1.1 200 OK\r\nContent-Type: image/x-icon\r\nContent-Length: 4\r\n\r\n\x89PNG"
 
 try:
     app = Routine()

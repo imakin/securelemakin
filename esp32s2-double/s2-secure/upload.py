@@ -49,10 +49,9 @@ def upload(filename, mode=MODE_MPY):
     cmd = f"mpy-cross {filename}"
     o = subprocess.check_output(cmd,shell=True)
     print(f"compiled to {newfile}")
-    filename = newfile
   else:
     newfile = filename
-  cmd = f"pyboard.py -d {device} -f cp {newfile} :{filename}"
+  cmd = f"pyboard.py -d {device} -f cp {newfile} :{newfile}"
   print(cmd)
   o = subprocess.check_output(cmd,shell=True)
   print(o.decode('utf8'))

@@ -1,4 +1,5 @@
 from os import listdir
+from machine import reset
 
 #my basic API
 def readfile(filename):

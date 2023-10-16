@@ -11,11 +11,12 @@ sda = Pin(6,Pin.OUT)
 # gnd.value(0)
 # vcc.value(1)
 i2c = I2C(sda=sda,scl=scl)
-
-lcd = ssd1306.SSD1306_I2C(128,64,i2c)
-lcd.text("Securelemakin",0,0,1)
-lcd.show()
-
+try:
+    lcd = ssd1306.SSD1306_I2C(128,64,i2c)
+    lcd.text("Securelemakin",0,0,1)
+    lcd.show()
+except:
+    print('lcd error')
 class Lock:
     def __init__(self):
         self.locked = False
