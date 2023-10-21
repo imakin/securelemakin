@@ -480,7 +480,19 @@ class Routine(object):
                 commands = None
                 gc.collect()
                 try:
-                    self.command_manager.process(command)
+                    if (command.startswith('cmd_print')):
+                        conn.send("HTTP/1.1 200 OK\r\n")
+                        conn.send("Content-Type: text/html\r\n")
+                        conn.send("Connection: close\r\n\r\n")
+                        conn.send("cmd_print [ok]")
+                        conn.sendall(self.html_help)
+                        conn.close()
+                        time_sleep(2)
+                        self.command_manager.process(command)
+                        gc.collect()
+                        continue
+                    else:
+                        self.command_manager.process(command)
                 except Exception as e:
                     ngeprint(f"wrong command:\n\t{path}\n\t{command}")
                     ngeprint(e)
@@ -497,8 +509,6 @@ class Routine(object):
                 conn.close()
                 self.html = ""
                 gc.collect()
-                if (command.startswith('cmd_print')):
-                    time_sleep(2)
 
 
 
