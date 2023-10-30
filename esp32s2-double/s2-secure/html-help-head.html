@@ -6,13 +6,51 @@
     <script>
     !function(e){"use strict";function r(e,n){var t=/[^\w\-.:]/.test(e)?new Function(r.arg+",tmpl","var _e=tmpl.encode"+r.helper+",_s='"+e.replace(r.regexp,r.func)+"';return _s;"):r.cache[e]=r.cache[e]||r(r.load(e));return n?t(n,r):function(e){return t(e,r)}}r.cache={},r.load=function(e){return document.getElementById(e).innerHTML},r.regexp=/([\s'\\])(?!(?:[^{]|\{(?!%))*%\})|(?:\{%(=|#)([\s\S]+?)%\})|(\{%)|(%\})/g,r.func=function(e,n,t,r,c,u){return n?{"\n":"\\n","\r":"\\r","\t":"\\t"," ":" "}[n]||"\\"+n:t?"="===t?"'+_e("+r+")+'":"'+("+r+"==null?'':"+r+")+'":c?"';":u?"_s+='":void 0},r.encReg=/[<>&"'\x00]/g,r.encMap={"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;","'":"&#39;"},r.encode=function(e){return(null==e?"":""+e).replace(r.encReg,function(e){return r.encMap[e]||""})},r.arg="o",r.helper=",print=function(s,e){_s+=e?(s==null?'':s):_e(s);},include=function(s,d){_s+=tmpl(s,d);}","function"==typeof define&&define.amd?define(function(){return r}):"object"==typeof module&&module.exports?module.exports=r:e.tmpl=r}(this);
     </script>
+    <style>
+        #status{
+            position: fixed;
+            right: 0;
+            bottom: 0;
+            text-align: center;
+            padding: 1vw;
+            background-color: gray;
+            color: red;
+        }
+        #status span{
+            display: none;
+        }
+        #status.processing #processing{
+            display: inline-block;
+        }
+        #status.standby #standby{
+            display: inline-block;
+        }
+    </style>
 </head>
 <body>
+    <div id="status" class="">
+        <span id="processing">processing...</span>
+        <span id="standby">ok</span>
+    </div>
+
     <script type="text/plain" id="tmpl-ul">
         <ul>
             {% for (let i=0;i<o.lis.length;i++){ %}
                 <li {%#o.lis[i].attribute %} >
                     {%#o.lis[i].inner %}
+                </li>
+            {% } %}
+        </ul>
+    </script>
+    <script type="text/plain" id="tmpl-command">
+        <ul>
+            {% for (let i=0;i<o.lis.length;i++){ %}
+                {% let item = o.lis[i]; %}
+                <li class="data-link">
+                    <button class="bt_cmd" type="button" data-url="{%#item.url %}">
+                        {%#item.name %}
+                    </button>
+                    <a href="{%#item.url %}">{%#item.name %} (link)</a>
                 </li>
             {% } %}
         </ul>
@@ -51,37 +89,7 @@
             </p>
             <button type="button" id="new-data-submit">OK</button>
         </form>
-        <script>
-            document.querySelector('#new_key_show').addEventListener('change',(ev)=>{
-                let inp = document.querySelector('#new_key');
-                if (ev.currentTarget.checked) {inp.setAttribute('type','')}
-                else {inp.setAttribute('type',"password")}
-                console.log(ev.currentTarget,inp.type);
-            })
-            let new_message = document.querySelector('#new_message');
-            new_message.addEventListener('focus',(ev)=>{
-                ev.currentTarget.setAttribute('type','text');
-            });
-            new_message.addEventListener('blur',(ev)=>{
-                ev.currentTarget.setAttribute('type','password');
-            });
-
-            function upload(){
-                
-                let data = [
-                    document.querySelector('#new_name').value,
-                    document.querySelector('#new_message').value,
-                    document.querySelector('#new_key').value,
-                    document.querySelector('#new_overwrite').checked?"overwrite":""
-                ].join(';;;');
-                fetch('/cmd_encrypt', {
-                    method: 'POST',
-                    headers: {
-                    'Content-Type': 'text/plain',
-                    },
-                    body: data
-                })
-            }
-            document.querySelector('#new-data-submit').addEventListener('click',upload)
-        </script>
     </div>
+
+    <h3>reset</h3>
+    <button type="button" id="bt_reset">Restart</button>

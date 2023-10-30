@@ -20,8 +20,9 @@ from machine import (
     unique_id,
     UART,
     # ADC,
-    freq,
+    freq
 )
+from machine import reset as machine_reset
 from machine import SoftI2C as I2C
 gc.collect()
 print(gc.mem_free())
@@ -147,6 +148,9 @@ class CommandManager(object):
         if command_manager==None:
             command_manager = CommandManager()
         return command_manager
+    
+    def cmd_reset(self):
+        machine_reset()
 
     def cmd_print(self,securedata_name):
         b = bytearray(data_manager.get_data(securedata_name))
@@ -472,7 +476,7 @@ class Routine(object):
                     gc.collect()
                     post_data_start = request_message.find('\r\n\r\n')
                     if post_data_start>=0:
-                        command += " "+request_message[post_data_start+4:]
+                        command += " "+request_message[post_data_start+4:] #the cmd_* parameter is in POST body
                         print(f"POST executing {command}")
                 request_message = None
                 lines = None
@@ -496,6 +500,9 @@ class Routine(object):
                 except Exception as e:
                     ngeprint(f"wrong command:\n\t{path}\n\t{command}")
                     ngeprint(e)
+                
+                if (command.startswith('cmd_encrypt')):
+                    self.html_build()
                 gc.collect()
                 
 
@@ -540,14 +547,14 @@ class Routine(object):
                 for f in dir(self.command_manager) if f.startswith('cmd') 
             ]}
         )
-        self.html_help += ";"
+        self.html_help += ";\n"
 
         self.html_help += "let data_data_list = "
         self.html_help += json_dumps(
             {"lis":[
                 {
-                    "attribute":"class='data-link'",
-                    "inner":f'<a href="/{"cmd_otp" if sec.startswith('otp_') else "cmd_print"}/{sec}">{sec}</a>'
+                    "name":f"{sec}",
+                    "url":f"/{'cmd_otp' if sec.startswith('otp_') else 'cmd_print'}/{sec}"
                 }
                 for sec in data_manager.get_data_keys()
             ]}

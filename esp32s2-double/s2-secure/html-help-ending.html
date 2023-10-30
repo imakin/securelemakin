@@ -1,10 +1,78 @@
+
     <script>
+        function status_set(class_name){//class_name: processing or standby
+            document.getElementById('status').setAttribute('class','');
+            document.getElementById('status').classList.add(class_name);
+        }
+        function status_processing(){status_set('processing')};
+        function status_standby(){status_set('standby')};
+        
         document.querySelector('#command-list').innerHTML = tmpl('tmpl-ul',data_command_list);
-        document.querySelector('#data-list').innerHTML = tmpl('tmpl-ul',data_data_list);
+        document.querySelector('#data-list').innerHTML = tmpl('tmpl-command',data_data_list);
 
         Array.prototype.forEach.call(document.querySelectorAll('.data-link'),(li)=>{
-
+            let bt = li.querySelector('.bt_cmd');
+            bt.addEventListener('click',(ev)=>{
+                status_processing();
+                let url = ev.currentTarget.dataset.url;
+                fetch(url,{
+                    method: 'GET'
+                }).then((r)=>{
+                    if (r.ok){
+                        status_standby();
+                    }
+                })
+            })
         });
+        
+        
+        document.querySelector('#new_key_show').addEventListener('change',(ev)=>{
+            let inp = document.querySelector('#new_key');
+            if (ev.currentTarget.checked) {inp.setAttribute('type','')}
+            else {inp.setAttribute('type',"password")}
+            console.log(ev.currentTarget,inp.type);
+        })
+        let new_message = document.querySelector('#new_message');
+        new_message.addEventListener('focus',(ev)=>{
+            ev.currentTarget.setAttribute('type','text');
+        });
+        new_message.addEventListener('blur',(ev)=>{
+            ev.currentTarget.setAttribute('type','password');
+        });
+
+        function upload(){
+            
+            let data = [
+                document.querySelector('#new_name').value,
+                document.querySelector('#new_message').value,
+                document.querySelector('#new_key').value,
+                document.querySelector('#new_overwrite').checked?"overwrite":""
+            ].join(';;;');
+            status_processing();
+            fetch('/cmd_encrypt', {
+                method: 'POST',
+                headers: {
+                'Content-Type': 'text/plain',
+                },
+                body: data
+            }).then((resp)=>{
+                if (resp.ok){
+                    status_standby();
+                }
+            });
+        }
+        document.querySelector('#new-data-submit').addEventListener('click',upload);
+
+
+
+        document.getElementById('bt_reset').addEventListener('click',(ev)=>{
+            status_processing();
+            fetch('/cmd_reset',{method:'GET'}).then((resp)=>{
+                if (resp.ok){
+                    status_standby();
+                }
+            })
+        })
     </script>
 </body>
 </html>
