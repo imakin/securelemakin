@@ -360,60 +360,6 @@ class Routine(object):
                 if (time_time()-timer_buttonroutine)>2:
                     break
 
-            #self.i2c routine
-            """
-            try:
-                readings[0] = 0
-                p = 0
-                while True:
-                    newreads = self.i2c.readfrom(self.address, 1)
-                    if newreads[0]==0 or newreads[0]==0xff:
-                        break
-                    readings[p] = newreads[0]
-                    p+=1
-                    if p>=len(readings):
-                        break
-                    time_sleep(0.01)
-                if readings[0]==0:
-                    raise OSError("no data")
-                process_return = 0
-                print(readings)
-                l = 0
-                r = 1
-                non_gibberish_end = self.bytearray_rstrip_pos(readings)
-                ngeprint(f"non giberish end {non_gibberish_end}")
-                while True and non_gibberish_end>0:
-                    while readings[r]!=ord('\n'):
-                        r = r+1
-                        if r>non_gibberish_end:
-                            break
-                    try:
-                        if (r-l<100):
-                            ngeprint(f"partial: BEGIN {readings[l:r]} END")
-                        process_return = self.command_manager.process(readings[l:r])
-                        self.last_wrong_command = b''
-                    except Exception as e:
-                        wrong_command = self.bytearray_rstrip(readings)
-                        ngeprint(f"{e} wrong command {wrong_command}")
-                    l = r+1
-                    r += 2
-                    if r>non_gibberish_end:
-                        break
-                print(f"i2c done {process_return}")
-                if process_return==CONST.PR_BUTTON_MODE:
-                    continue #straight to next loop to catch next button press
-            except OSError:
-                sampling += 1
-                if sampling>=10:
-                    # ~ ngeprint("no data")
-                    sampling = 0
-            finally:
-                gc.collect()
-                try:
-                    self.i2c.stop()
-                except:pass
-            """
-                
             #UART routine
             serialdata = self.uart.read()
             if serialdata:
