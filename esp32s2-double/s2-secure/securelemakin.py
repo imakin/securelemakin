@@ -430,7 +430,7 @@ class Routine(object):
                 commands = None
                 gc.collect()
                 try:
-                    if (command.startswith('cmd_print')):
+                    if (command.startswith('cmd_print') or command.startswith('cmd_otp')):
                         conn.send("HTTP/1.1 200 OK\r\n")
                         conn.send("Content-Type: text/html\r\n")
                         conn.send("Connection: close\r\n\r\n")

@@ -24,6 +24,59 @@
                 })
             })
         });
+
+        const search = document.querySelector('#search');
+        window.search_timer = null;
+        function search_execute(){
+            let q = search.value;
+            q = q.replaceAll(/[_\s]/g,'[_\s]'); //replace _ or ' ' with literal string '[_\s]'
+            let re = RegExp(q);
+            let i =0;
+            let lis = document.querySelectorAll('.data-link');
+            if (q.length>0){
+                //hide info block
+                Array.prototype.forEach.call(document.querySelectorAll('.info'), el=>{
+                    el.style.display = 'none'
+                })
+                //filter Data List
+                for (i=0;i<lis.length;i++){
+                    let text = lis[i].querySelector('button').innerText;
+                    if (re.exec(text)==null){
+                        lis[i].style.display = 'none';
+                    }
+                    else{
+                        lis[i].style.display = 'block';
+                    }
+                }
+            }
+            else{
+                //show info block
+                Array.prototype.forEach.call(document.querySelectorAll('.info'), el=>{
+                    el.style.display = 'block'
+                })
+                //unfilter Data List
+                for (i=0;i<lis.length;i++){
+                    lis[i].style.display = 'block';
+                }
+            }
+        }
+        search.addEventListener('input',(ev)=>{
+            clearTimeout(window.search_timer);
+            window.search_timer = setTimeout(search_execute, 1000);
+        });
+        search.addEventListener('keydown',ev=>{
+            if (ev.key=='Enter'){
+                //get the top filtered Data List and execute it
+                let i =0;
+                let lis = document.querySelectorAll('.data-link');
+                for (i=0;i<lis.length;i++){
+                    if (lis[i].style.display!='none'){
+                        lis[i].querySelector('button').click();
+                        break;
+                    }
+                }
+            }
+        })
         
         
         document.querySelector('#new_key_show').addEventListener('change',(ev)=>{
