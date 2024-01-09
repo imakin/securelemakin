@@ -9,20 +9,47 @@
         
         document.querySelector('#command-list').innerHTML = tmpl('tmpl-ul',data_command_list);
         document.querySelector('#data-list').innerHTML = tmpl('tmpl-command',data_data_list);
+        
 
         Array.prototype.forEach.call(document.querySelectorAll('.data-link'),(li)=>{
-            let bt = li.querySelector('.bt_cmd');
-            bt.addEventListener('click',(ev)=>{
-                status_processing();
-                let url = ev.currentTarget.dataset.url;
-                fetch(url,{
-                    method: 'GET'
-                }).then((r)=>{
-                    if (r.ok){
-                        status_standby();
+            //execute type keyboard mode
+            let bts = li.querySelectorAll('.bt_cmd');
+            Array.prototype.forEach.call(bts,(bt)=>{
+                bt.addEventListener('click',(ev)=>{
+                    status_processing();
+                    let url = ev.currentTarget.dataset.url;
+                    const keys = asyml_randkey();
+                    const currentTarget = ev.currentTarget;
+
+                    if (currentTarget.classList.contains('bt_cmd_copy')){
+                        //from static/secret.js
+                        url = `${url}/${keys.n}/${keys.pub}`;
                     }
-                })
-            })
+
+                    fetch(url,{
+                        method: 'GET'
+                    }).then((r)=>{
+                        return r.text()
+                    }).then((text)=>{
+                        window.hasil = text;
+                        let cipher = JSON.parse(text.replaceAll(`'`,`"`));
+                        let txt = asyml_dec(cipher, keys.sec, keys.n);
+                        Array.prototype.forEach.call(
+                            document.querySelectorAll('input#textcopy'),
+                            (el)=>{el.remove()}
+                        );
+                        let tp = document.createElement('input');
+                        tp.id = 'textcopy';
+                        tp.value = txt;
+                        currentTarget.after(tp);
+                        setTimeout(()=>{
+                            tp.focus();
+                            tp.select();
+                        },500);
+                        status_standby();
+                    });
+                });
+            });
         });
 
         const search = document.querySelector('#search');

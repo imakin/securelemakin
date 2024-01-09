@@ -27,6 +27,8 @@ from machine import SoftI2C as I2C
 gc.collect()
 print(gc.mem_free())
 
+import asymetriclight
+
 freq(240_000_000)
 
 last_printed = ""
@@ -152,7 +154,11 @@ class CommandManager(object):
     def cmd_reset(self):
         machine_reset()
 
-    def cmd_print(self,securedata_name):
+    def cmd_print(self,securedata_name,output_mode=False):
+        """
+        @param output_mode: if True, return output instead of printing to keyboard. 
+        return str (not bytes)
+        """
         b = bytearray(data_manager.get_data(securedata_name))
         s = enc.bytearray_strip(
             enc.decrypt(b,self.password.get())
@@ -160,6 +166,8 @@ class CommandManager(object):
         print(s)
         s = s.replace(r'\t','\t') #support escape sequence only for \t and \n
         s = s.replace(r'\n','\n')
+        if output_mode:
+            return s
         keyboard.on()
         while len(s)>0:
             #dont forget our i2c cant send more than 42 bytes at once
@@ -170,6 +178,13 @@ class CommandManager(object):
         # ~ time_sleep(0.5)
         self.ctx.i2c.stop()
         print("[OK]")
+
+    def cmd_html_print(self,securedata_name_and_encryptionkey):
+        securedata_name,key_n,key_pub = securedata_name_and_encryptionkey.split(' ')
+        
+        rawoutput = self.cmd_print(securedata_name, output_mode=True)
+        chiper = asymetriclight.asyml_enc(rawoutput,int(key_pub),int(key_n))
+        self.ctx.html = str(chiper)
 
     """
     do keyboard ngeprint for chr(char_byte)
@@ -193,16 +208,29 @@ class CommandManager(object):
     def cmd_password(self,password):
         self.password.set(password)
 
-    def cmd_otp(self,securedata_name):
+    def cmd_otp(self,securedata_name,output_mode=False):
+        #param output_mode: if True, return output instead of printing to keyboard
         b = bytearray(data_manager.get_data(securedata_name))
         s = enc.bytearray_strip(
             enc.decrypt(b,self.password.get())
         )
         pin = totp.now(s)
+        if output_mode:
+            return pin
         keyboard.on()
         self.ctx.i2c.writeto(self.ctx.address,pin.encode('utf8'))
         time_sleep(0.5)
         keyboard.off()#s2-keyboard only check pin on the begining of i2c data, so it's safe to off() while s2-keyboard is still receiving
+
+    def cmd_html_otp(self,securedata_name_and_encryptionkey):
+        securedata_name,key_n,key_pub = securedata_name_and_encryptionkey.split(' ')
+        print("CMD HTML OTP",securedata_name,key_n,key_pub)
+        securedata_name_and_encryptionkey = None
+        gc.collect()
+        rawoutput = self.cmd_otp(securedata_name, output_mode=True)
+        print("Raw:",rawoutput)
+        chiper = asymetriclight.asyml_enc(rawoutput,int(key_pub),int(key_n))
+        self.ctx.html = str(chiper)
 
     def cmd_list(self,nothing):
         files = ";".join(listdir('/data'))
@@ -384,7 +412,13 @@ class Routine(object):
                 self.server_last_connection = time_time()
                 led("toggle")
                 gc.collect()
-                request_message = conn.recv(1024).decode('utf8')
+                recv = conn.recv(1024)
+                try:
+                    request_message = recv.decode('utf8')
+                    recv = None
+                except Exception as e:
+                    print(recv)
+                    raise e
                 if not request_message:
                     continue
                 lines = request_message.split('\r\n') #to get the first line
@@ -405,15 +439,49 @@ class Routine(object):
                     except:
                         print("request again timeout")
                 
-                if lines and lines[0].startswith('GET /favicon.ico'):
+                elif lines and lines[0].startswith('GET /favicon.ico'):
                     conn.sendall(self.html_favicon())
                     conn.close()
                     request_message = None
                     lines = None
-                    GET_path = None
-                    commands = None
                     gc.collect()
                     continue
+
+                elif lines and lines[0].startswith('GET /static/'):
+                    path = lines[0].split(' ')[1].lower()
+                    ct = 'text/html'
+                    if path.endswith('.js'):
+                        ct = 'application/javascript'
+                    elif path.endswith('.css'):
+                        ct = 'text/css'
+                    elif path.endswith('.svg'):
+                        ct = 'image/svg+xml'
+                    elif path.endswith('.jpg') or path.endswith('.jpeg'):
+                        ct = 'image/jpeg'
+                    elif path.endswith('.png'):
+                        ct = 'image/png'
+
+                    print(f'opening file {path}')
+                    try:
+                        with open(path) as f:
+                            text = f.read()
+                            conn.send("HTTP/1.1 200 OK\r\n")
+                            conn.send(f"Content-Type: {ct}\r\n")
+                            conn.send(f"Content-Length: {len(text)}\r\n\r\n")
+                            conn.sendall(text)
+                    except:
+                        conn.send("HTTP/1.1 404 Not Found\r\n")
+                        conn.send(f"Content-Type: text/plain\r\n")
+                        conn.send(f"Content-Length: 16\r\n\r\n")
+                        conn.send(f"File not found\r\n")
+                        
+                        
+                    conn.close()
+                    request_message = None
+                    lines = None
+                    gc.collect()
+                    continue
+
                 path = lines[0].split(' ')[1] #to get the 2nd word from the first line
                 commands = path.split('/')
                 command = " ".join([word for word in commands if len(word)>0])

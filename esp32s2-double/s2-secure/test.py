@@ -4,10 +4,13 @@ import ssd1306
 
 class Test(object):
     def __init__(self):
+        pass
+    
+    def init_i2c(self):
         self.i2c = SoftI2C(sda=Pin(2),scl=Pin(3),freq=100000,timeout=200000)
         self.slaveaddress = 100;
 
-    def bacai2c(self):
+    def baca_i2c(self):
         txt = b'';
         while True:
             time.sleep(0.1)
