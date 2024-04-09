@@ -1,3 +1,7 @@
+"""
+@author: Izzulmakin 2023
+tools to find prime, using multiprocessing and AVX2 SIMD through numpy 
+"""
 import os
 import sys
 import time
@@ -186,4 +190,4 @@ def get_closest_prime(n,numthreads=4,unattended=True,simd=True):
 
 
 if __name__=="__main__":
-    print(get_closest_prime(230998739345669))
+    print(get_closest_prime(5087293934544))

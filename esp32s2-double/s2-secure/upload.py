@@ -51,7 +51,7 @@ def upload(filename, mode=MODE_MPY):
     print(f"compiled to {newfile}")
   else:
     newfile = filename
-  cmd = f"pyboard.py -d {device} -f cp {newfile} :{newfile}"
+  cmd = f"python ../../reusable/pyboard.py --no-soft-reset -d {device} -f cp {newfile} :{newfile}"
   print(cmd)
   o = subprocess.check_output(cmd,shell=True)
   print(o.decode('utf8'))

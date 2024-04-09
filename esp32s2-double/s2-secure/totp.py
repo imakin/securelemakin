@@ -1,8 +1,10 @@
 from base64 import b32decode
 from hashlib import sha1
 import hmac
-
-from ntptime import settime as ntptime_settime
+try:
+    from ntptime import settime as ntptime_settime
+except:
+    def ntptime_settime():pass
 from time import mktime,localtime
 import gc
 

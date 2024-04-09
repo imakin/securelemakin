@@ -29,7 +29,7 @@ print(gc.mem_free())
 
 import asymetriclight
 
-freq(240_000_000)
+freq(160_000_000)
 
 last_printed = ""
 def ngeprint(s,force_display=False):

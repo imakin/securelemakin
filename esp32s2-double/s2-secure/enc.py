@@ -1,3 +1,8 @@
+"""
+@author: Izzulmakin
+2022
+simple encrypt/decrypt readable string with strong padding
+"""
 is_micro = True
 try:
     #for esp8266 micropython

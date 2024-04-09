@@ -168,9 +168,9 @@ def make_many_key(howmuch):
         key = (generate_keypair(p,q))
         print('n:',key[0][0],key[0][1],key[1][1],key[0][0]<0x7fffffff,sep=", ")
 
-def make_key(close_to_prime_a, close_to_prime_b):
-    p = get_closest_prime(close_to_prime_a)
-    q = get_closest_prime(close_to_prime_b)
+def make_key(close_to_prime_a, close_to_prime_b, numthreads=4):
+    p = get_closest_prime(close_to_prime_a,numthreads=numthreads)
+    q = get_closest_prime(close_to_prime_b,numthreads=numthreads)
     key = generate_keypair(p,q)
     print(key)
     return key
