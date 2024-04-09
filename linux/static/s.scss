@@ -1,0 +1,25 @@
+ul{
+    display: flex;
+    flex-wrap: wrap;
+    width: 95vw;
+    flex-direction: column;
+
+    // display: grid;
+    // grid-template-columns: repeat(auto-fit, minmax(15vw, 1fr));
+    // grid-auto-rows: minmax(auto, auto);
+}
+li{
+    display: inline-block;
+    button{
+        width: 15vw;
+        min-width: 150px;
+        max-width: 300px;
+        height: auto;
+        padding: 1.5em 0.5em;
+        border-color: transparent;
+        &.highlight{
+            border-color: blue;
+            color: green;
+        }
+    }
+}

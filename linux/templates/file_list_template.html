@@ -1,0 +1,22 @@
+<html>
+    <head>
+        <title>File List</title>
+        <script>
+            let modeljson = {{ model | safe }};
+        </script>
+        <link rel="stylesheet" href="{{ url_for('static', filename='s.css') }}">
+        <script src="{{ url_for('static', filename='app.js') }}"></script>
+    </head>
+    <body>
+        <h1>Files in ./data folder: filter({{ model["filter"] }})</h1>
+        <ul id="list">
+            {% for file in model["files"] %}
+                <li>
+                    <button class="item" type="button">
+                        {{ file }}
+                    </button>
+                </li>
+            {% endfor %}
+        </ul>
+    </body>
+</html>
