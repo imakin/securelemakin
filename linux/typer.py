@@ -19,6 +19,8 @@ app = Flask(__name__)
 class TyperApp():
     def __init__(self):
         self.DATA_DIR = 'data'
+        import secret_masterpassword
+        self.pw = secret_masterpassword.get_pw(enc)
 
     def led(self,on):
         #display indicator, i use keyboard backlight
@@ -30,20 +32,24 @@ class TyperApp():
     def alert(self,message):
         subprocess.check_call(['notify-send',message])
     
-    def auth(self):
+    def auth(self, title=''):
         #auth in my laptop, i use fingerprint
         # os.path.isfile('/usr/bin/fprintd-verify')
-        self.alert('fingerprint auth')
-        for c in range(3):
+        # self.alert(f'fingerprint auth {title}')
+        for c in range(1):
             try:
-                subprocess.check_call('fprintd-verify')
+                subprocess.check_call(f'/opt/miniconda/miniconda3/bin/python /home/makin/development/imakingit/SmartHome/facedoor/verify_person.py {os.environ["USER"]}',shell=True)
                 return True #break
             except subprocess.CalledProcessError:
+                time.sleep(0.5)
+                self.alert(f'auth failed {title}')
                 pass
 
+        return False
 
-    def read(self,filename,safer=False):
-        if not self.auth():
+
+    def read(self,filename,safer=False,noauth=False):
+        if not(noauth or self.auth(f'for {filename}')): #equivalent not(noauth) and not(self.auth())
             self.alert('securelemakin auth error')
             return False
         with open(os.path.join(self.DATA_DIR, filename), 'rb') as f:
@@ -55,29 +61,33 @@ class TyperApp():
     
     
     
-    def type(self,filename):
+    def type(self,filename,noauth=False):
         # pyautogui.write(self.read(filename),interval=0.05)
         i = 0
-        dt = self.read(filename,safer=True)
-        if (filename.startswith('otp_')):
-            dt = totp.now("".join(chr(c) for c in dt)) #get the TOTP
-            dt = [ord(c) for c in dt] #make it array of ord again
-        while (i<len(dt)):
-            # time.sleep(0.02)
-            c = chr(dt[i])
-            # print(c)
-            try:
-                if c=='\\' and chr(dt[i+1])=='n':
-                    pyautogui.press('enter')
-                elif c=='\\' and chr(dt[i+1])=='t':
-                    pyautogui.press('tab')
-                else:
-                    raise Exception()
-                i += 2
-                continue
-            except:pass
-            pyautogui.write(c)
-            i += 1
+        dt = self.read(filename,safer=True,noauth=noauth)
+        try:
+            self.led(True)
+            if (filename.startswith('otp_')):
+                dt = totp.now("".join(chr(c) for c in dt)) #get the TOTP
+                dt = [ord(c) for c in dt] #make it array of ord again
+            while (i<len(dt)):
+                # time.sleep(0.02)
+                c = chr(dt[i])
+                # print(c)
+                try:
+                    if c=='\\' and chr(dt[i+1])=='n':
+                        pyautogui.press('enter')
+                    elif c=='\\' and chr(dt[i+1])=='t':
+                        pyautogui.press('tab')
+                    else:
+                        raise Exception()
+                    i += 2
+                    continue
+                except:pass
+                pyautogui.write(c)
+                i += 1
+        finally:
+            self.led(False)
 
 typerapp = TyperApp()
 
@@ -91,13 +101,23 @@ def file_list(filter=""):
         "filter":filter
     })
 
+@app.route('/list/')
+def file_list_raw():
+    files = os.listdir('./data')
+    files.sort()
+    return Response(
+        "\n".join(files)
+        ,status=200
+        ,content_type='text/plain'
+    )
+
+
 @app.route('/type/<path:filename>')
 def typer_type(filename):
     try:
-        typerapp.led(True)
         typerapp.type(filename)
     finally:
-        typerapp.led(False)
+        pass
     return Response("OK", status=200, content_type='text/plain')
 
 if __name__=="__main__":
