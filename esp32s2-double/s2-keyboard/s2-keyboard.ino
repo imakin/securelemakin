@@ -70,24 +70,12 @@ class CommandManager{
 CommandManager cmd;
 
 void setup(){
-    // Serial.begin(115200);
-    // for (int i=0;i<10;i++){
-    //     delay(1000);
-    //     Serial.println("ok0");
-    // }
     delay(1000);
 
     pinMode(ledpin, OUTPUT);
     pinMode(keyboard_echo_flag_pin, INPUT);
     digitalWrite(keyboard_echo_flag_pin, LOW);
     digitalWrite(ledpin, LOW);
-
-/*
-        self.bt_left = Pin(12,Pin.PULL_UP)
-        self.bt_right = Pin(35,Pin.PULL_UP)
-        self.bt_ok = Pin(33,Pin.PULL_UP)
-        let s2-secure control those pin
-        */
 
     keyboard.begin();
 
@@ -96,29 +84,11 @@ void setup(){
     Wire.onReceive(wireOnReceive);
     Wire.onRequest(wireOnRequest);
     
-    // keyboard.sendChar('B');
-    // delay(1000);
-    // keyboard.sendChar('i');
-    // delay(1000);
-    // keyboard.sendChar('s');
-    // delay(1000);
-}
 
 
 void loop() {
     char chr;
     bool ngisi = false;
-    // while (Serial.available()>0){
-    //     chr = (char)Serial.read();
-    //     while (cmd.is_sending);
-    //     cmd.append(chr);
-    //     ngisi = true;
-    // }
-    // if (ngisi) {
-    //     cmd.append(0);
-    //     Serial.print("pos_fill: ");
-    //     Serial.println(cmd.pos_fill);
-    // }
 }
 
 /**
@@ -136,6 +106,13 @@ void loop() {
  * esp8266 may transmit:
  *      securedata typing initiated by 32u4
  *      securedata typing initiated by esp8266's own web service
+ * 
+ * 
+ * 
+ * FOR esp32s2-double it's simpler:
+ * anytime receiving wire/i2c data and keyboard_echo_flag_pin is high
+ * will echo wire/i2c char as keyboard typing
+ * 
  */
 
 bool is_printable(uint8_t c){
@@ -160,9 +137,6 @@ bool is_printable(char c){
 void wireOnRequest(){
     cmd.is_sending = true;
     cmd.send_next(1);
-    //~ for (int i =0;i<32;i++){
-        //~ cmd.send_next(1);
-    //~ }
     cmd.is_sending = false;
 }
 
@@ -180,7 +154,6 @@ void wireOnReceive(int received_length){
     //~ bool text_set = false;
     while (Wire.available()) {
         char c = Wire.read();
-        // cmd.append(c+1);
         if (keyboardmode) {
             digitalWrite(ledpin,HIGH);
             if (is_printable(c)){
@@ -192,15 +165,13 @@ void wireOnReceive(int received_length){
             }
         }
         else {
-            //flag pin is not high, echo back to USB-Host
+            //flag pin is not high, echo back to USB-Host?
             //~ text += c;
             //~ text_set = true;
             // Serial.write(c);
         }
     }
     digitalWrite(ledpin,LOW);
-    //~ Serial.print("received: ");
-    //~ Serial.println(received_length);
 }
 
 
