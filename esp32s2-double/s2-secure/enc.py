@@ -182,7 +182,7 @@ def encrypt(message,password):
     return message_padded
 
 """
-@param message: bytearray
+@param message: bytearray, operation done in place to save memory (esp32)
 @param password: str
 @return bytearray
 """

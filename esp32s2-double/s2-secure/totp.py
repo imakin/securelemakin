@@ -4,7 +4,9 @@ import hmac
 try:
     from ntptime import settime as ntptime_settime
 except:
+    #non esp
     def ntptime_settime():pass
+    from time import gmtime
 from time import mktime,localtime
 import gc
 
@@ -87,18 +89,26 @@ def epoch_2000_to_1970(s):
     return s+946_684_800
     
 
-def now(secretcode):
+def now(secretcode, on_linux=False):
     aku = OTP(secretcode)
     ntptime_settime()
-    hasil =  aku.generate_otp(
-        int(
-            epoch_2000_to_1970(mktime(localtime()))
-            //30 #TOTP timestep
+    if on_linux:
+        hasil = aku.generate_otp(
+            int(
+                mktime(localtime())#anomaly, gmtime() should be correct but no
+                //30
+            )
         )
-    )
+    else:
+        hasil =  aku.generate_otp(
+            int(
+                epoch_2000_to_1970(mktime(localtime()))
+                //30 #TOTP timestep
+            )
+        )
     aku = None
     gc.collect()
     return hasil
-    
+
 # ~ print(aku.generate_otp(int(time.mktime(datetime.datetime.now().timetuple())/30)))
 

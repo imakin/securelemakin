@@ -17,20 +17,33 @@ import totp
 app = Flask(__name__)
 
 class TyperApp():
-    def __init__(self):
+    def __init__(self,title="server"):
+        print(f"ini{title}")
         self.DATA_DIR = 'data'
         import secret_masterpassword
-        self.pw = secret_masterpassword.get_pw(enc)
+        self.pw = secret_masterpassword.get_pw(enc,title=title)
+        self.last_message = ""
 
     def led(self,on):
         #display indicator, i use keyboard backlight
+        prev_message = self.last_message
         if on:
+            self.alert(f"typing...", save_to_last_message=False)
             requests.get('http://127.0.0.1:8090/3')
         else:
+            self.alert(f"ready. [{self.last_message}]", save_to_last_message=False)
             requests.get('http://127.0.0.1:8090/0')
     
-    def alert(self,message):
-        subprocess.check_call(['notify-send',message])
+    def alert(self,message, save_to_last_message=True):
+        # subprocess.check_call(['notify-send',message])
+        try:
+            os.environ["GSETTINGS_SCHEMA_DIR"] = "/home/makin/tweak/gnome/extensions/gnomemakindisplay@izzulmakin/schemas"
+            subprocess.check_call(['gsettings','set','com.izzulmakin.gnomemakindisplay','panel-text',f'"{message}"'])
+            if save_to_last_message:
+                self.last_message = message
+        except Exception as e:
+            print(e)
+            e.print_exc()
     
     def auth(self, title=''):
         #auth in my laptop, i use fingerprint
@@ -38,11 +51,15 @@ class TyperApp():
         # self.alert(f'fingerprint auth {title}')
         for c in range(1):
             try:
-                subprocess.check_call(f'/opt/miniconda/miniconda3/bin/python /home/makin/development/imakingit/SmartHome/facedoor/verify_person.py {os.environ["USER"]}',shell=True)
+                d = subprocess.check_output(f'/opt/miniconda/miniconda3/bin/python /home/makin/development/imakingit/SmartHome/facedoor/verify_person_simple.py {os.environ["USER"]}',shell=True)
+                d = d.strip().decode('utf8')
+                d = f"Izzulmakin: {(200 - int(float(d)))/2}%"
+                self.alert(d)
                 return True #break
             except subprocess.CalledProcessError:
                 time.sleep(0.5)
-                self.alert(f'auth failed {title}')
+                d = d.strip().decode('utf8')
+                self.alert(f'auth failed {title} {d}')
                 pass
 
         return False
@@ -50,7 +67,7 @@ class TyperApp():
 
     def read(self,filename,safer=False,noauth=False):
         if not(noauth or self.auth(f'for {filename}')): #equivalent not(noauth) and not(self.auth())
-            self.alert('securelemakin auth error')
+            # self.alert('securelemakin auth error')
             return False
         with open(os.path.join(self.DATA_DIR, filename), 'rb') as f:
             cipher = bytearray(f.read())
@@ -65,10 +82,12 @@ class TyperApp():
         # pyautogui.write(self.read(filename),interval=0.05)
         i = 0
         dt = self.read(filename,safer=True,noauth=noauth)
+        if not dt:
+            return
         try:
             self.led(True)
             if (filename.startswith('otp_')):
-                dt = totp.now("".join(chr(c) for c in dt)) #get the TOTP
+                dt = totp.now("".join(chr(c) for c in dt),on_linux=True) #get the TOTP
                 dt = [ord(c) for c in dt] #make it array of ord again
             while (i<len(dt)):
                 # time.sleep(0.02)
@@ -89,7 +108,7 @@ class TyperApp():
         finally:
             self.led(False)
 
-typerapp = TyperApp()
+typerapp = None
 
 @app.route('/')
 @app.route('/<path:filter>')
@@ -122,5 +141,6 @@ def typer_type(filename):
 
 if __name__=="__main__":
     # app = TyperApp()
+    typerapp = TyperApp()
     # pyautogui.write(app.read('bismillah').decode('utf8'),interval=0.05)
     app.run(debug=True)

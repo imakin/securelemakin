@@ -176,7 +176,7 @@ def check_prime(v,numthreads=4,unattended=True,simd=True):
 """
 get closest prime between (n-3000) and n
 """
-def get_closest_prime(n,numthreads=4,unattended=True,simd=True):
+def get_closest_prime(n,numthreads=6,unattended=True,simd=True):
     maks = n
     
     for x in range(maks//6,maks//6-500,-1):

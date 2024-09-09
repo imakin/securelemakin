@@ -88,9 +88,6 @@ void setup(){
         self.bt_ok = Pin(33,Pin.PULL_UP)
         let s2-secure control those pin
         */
-    pinMode(12,INPUT);
-    pinMode(35,INPUT);
-    pinMode(33,INPUT);
 
     keyboard.begin();
 

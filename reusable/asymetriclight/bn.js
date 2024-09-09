@@ -1,5 +1,7 @@
 /**
- * Copyright Fedor Indutny, 2015.
+using git@github.com:indutny/bn.js.git
+
+* Copyright Fedor Indutny, 2015.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
