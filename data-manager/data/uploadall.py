@@ -19,7 +19,7 @@ files = os.listdir('.')
 if len(sys.argv)>1:
 	files = sys.argv[1:]
 for f in files:
-	if f.endswith('.py') or f.endswith('.dontupload'):
+	if f.endswith('.py') or f.endswith('.dontupload') or f.endswith('.sh'):
 		continue
 	if f.endswith('.raw'):
 		print(f'encrypting {f}')
