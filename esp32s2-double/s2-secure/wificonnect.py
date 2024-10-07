@@ -2,6 +2,7 @@ import network
 import time
 from secret import aplist
 
+network.hostname('securelemakin')
 wlan = network.WLAN(network.STA_IF) # create station interface
 print(f'connected: {wlan.isconnected()}')      # check if the station is connected to an AP
 if wlan.isconnected():

@@ -15,8 +15,8 @@ int passwordlen;
 #define commandmaxlen 128
 int commandlen = 0;
 
-#define sda_pin 2
-#define scl_pin 4
+#define sda_pin 35
+#define scl_pin 33
 
 unsigned long var_uint64;
 
@@ -83,7 +83,7 @@ void setup(){
     cmd.clear();
     Wire.onReceive(wireOnReceive);
     Wire.onRequest(wireOnRequest);
-    
+}
 
 
 void loop() {

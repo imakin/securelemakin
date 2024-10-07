@@ -34,9 +34,9 @@ except Exception as e:
 MODE_MPY = 'mpy'
 MODE_MIN = 'min'
 def upload(filename, mode=MODE_MPY):
-  if filename.endswith('.mpy'):
+  if filename.endswith('.mpy') or  filename in ["boot.py","main.py"]:
     newfile = filename
-  elif filename in ["boot.py","main.py"] or mode==MODE_MIN:
+  elif mode==MODE_MIN:
     newfile = f"/tmp/securelemakin_{filename}"
     
     with open(filename) as f:

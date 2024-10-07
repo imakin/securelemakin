@@ -1,3 +1,4 @@
+
 from os import listdir
 from time import sleep as time_sleep
 from time import time as time_time
@@ -12,7 +13,7 @@ print(gc.mem_free())
 gc.collect()
 print(gc.mem_free())
 import data_manager
-import display
+
 from json import dumps as json_dumps
 
 from machine import (
@@ -24,12 +25,31 @@ from machine import (
 )
 from machine import reset as machine_reset
 from machine import SoftI2C as I2C
-gc.collect()
-print(gc.mem_free())
-
 import asymetriclight
 
 freq(160_000_000)
+
+gc.collect()
+print(gc.mem_free())
+
+
+ledpin = Pin(15,Pin.OUT)
+def led(on_or_off):
+    if type(on_or_off)==int:
+        ledpin.value(1^on_or_off) #bitwise not
+    elif type(on_or_off)==bool:
+        if on_or_off: ledpin.value(0)
+        else: ledpin.value(1)
+    elif type(on_or_off)==str and on_or_off=="toggle":
+        ledpin.value(1^ledpin.value())
+
+
+
+for i in range(10):
+    led('toggle')
+    time_sleep(0.1)
+
+import display
 
 last_printed = ""
 def ngeprint(s,force_display=False):
@@ -55,15 +75,6 @@ def ngeprint(s,force_display=False):
 
 
 
-ledpin = Pin(2,Pin.OUT)
-def led(on_or_off):
-    if type(on_or_off)==int:
-        ledpin.value(1^on_or_off) #bitwise not
-    elif type(on_or_off)==bool:
-        if on_or_off: ledpin.value(0)
-        else: ledpin.value(1)
-    elif type(on_or_off)==str and on_or_off=="toggle":
-        ledpin.value(1^ledpin.value())
 
 
 class keyboard(object):
@@ -275,6 +286,23 @@ class CommandManager(object):
             self.data_pos += 1
             if self.data_pos>=len(self.data_keys):
                 self.data_pos = 0
+        elif message=="down":
+            current_alphabet = self.data_keys[self.data_pos][0]
+            overflow_counter = 0
+            while self.data_keys[self.data_pos][0]==current_alphabet and overflow_counter<2:
+                self.data_pos += 1
+                if self.data_pos>=len(self.data_keys):
+                    self.data_pos = 0
+                    overflow_counter += 1 #prevent infiniteloop if all data keys has the same first letter
+        elif message=="up":
+            current_alphabet = self.data_keys[self.data_pos][0]
+            overflow_counter = 0
+            while self.data_keys[self.data_pos][0]==current_alphabet and overflow_counter<2:
+                self.data_pos -= 1
+                if self.data_pos<=0:
+                    self.data_pos = len(self.data_keys)-1
+                    overflow_counter += 1 #prevent infiniteloop if all data keys has the same first letter
+        
         elif message=="BC" or message=="\n":
             key = self.data_keys[self.data_pos]
             command = "cmd_print"
@@ -283,8 +311,10 @@ class CommandManager(object):
             self.process(f"{command} {key}")
             ngeprint(f"{self.data_keys[self.data_pos]} executed",force_display=True)
             return
-                
-        ngeprint(self.data_keys[self.data_pos],force_display=True)
+        try:
+            ngeprint(self.data_keys[self.data_pos],force_display=True)
+        except Exception as e:
+            ngeprint(f"error {e}  {self.data_pos} {self.data_keys} ")
 
     """
     data_message examples:
@@ -340,7 +370,11 @@ class Routine(object):
         self.uart = UART(0,baudrate=115200,timeout=500)
 
         self.address = 100 #s2-keyboard self.address
-        self.i2c = I2C(sda=Pin(2),scl=Pin(4),freq=100000)
+        self.i2c = I2C(
+            sda=Pin(35),
+            scl=Pin(33),
+            freq=100000
+        )
 
         sampling = 0
 
@@ -354,27 +388,36 @@ class Routine(object):
         self.html = ""
 
 
-        self.bt_left    = Pin(12,Pin.IN,Pin.PULL_UP)
-        self.bt_right   = Pin(35,Pin.IN,Pin.PULL_UP)
-        self.bt_ok      = Pin(33,Pin.IN,Pin.PULL_UP)
+        self.bt_left    = Pin(8,Pin.IN,Pin.PULL_UP)
+        self.bt_right   = Pin(6,Pin.IN,Pin.PULL_UP)
+        self.bt_ok      = Pin(4,Pin.IN,Pin.PULL_UP)
+        self.bt_down    = Pin(10,Pin.IN,Pin.PULL_UP)
+        self.bt_up      = Pin(13,Pin.IN,Pin.PULL_UP)
+        self.bt_com     = Pin(14,Pin.OUT)
+        self.bt_com.value(0)
 
         def btval():
             if self.bt_ok.value()==0:return '\n'
             if self.bt_left.value()==0:return 'l'
             if self.bt_right.value()==0:return 'r'
+            if self.bt_down.value()==0:return 'down'
+            if self.bt_up.value()==0:return 'up'
             return 1
 
         ngeprint('securelemakin ready')
 
         keyboard.off()
         led(1)
-        readings = bytearray(256)
-        for x in range(len(readings)):readings[x]=0
+        ngeprint('tekan kene')
+        # readings = bytearray(256)
+        # for x in range(len(readings)):readings[x]=0
         while True:
             #button routine
             timer_buttonroutine = time_time()
             while True:
+                bt_timeout = 2
                 if btval()!=1:
+                    bt_timeout = 30 #longer timeout if bt is pressed
                     self.command_manager.button_mode(btval())
                     waiting_start = time_time()
                     while btval()!=1:
@@ -384,8 +427,10 @@ class Routine(object):
                         if time_time()-waiting_start>1:
                             self.command_manager.button_mode(btval())
                     timer_buttonroutine = time_time()
-                
-                if (time_time()-timer_buttonroutine)>2:
+                # elif (time_time()%2==0):
+                #     print(btval())
+                # ngeprint(btval())
+                if (time_time()-timer_buttonroutine)>bt_timeout:
                     break
 
             #UART routine
