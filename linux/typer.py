@@ -3,7 +3,9 @@
 import os
 import subprocess
 import sys
-import pyautogui
+# import pyautogui
+from pynput.keyboard import Controller  as KeyboardController
+from pynput.keyboard import Key as KeyboardKey
 import time
 import requests
 
@@ -18,6 +20,7 @@ app = Flask(__name__)
 
 class TyperApp():
     def __init__(self,title="server"):
+        self.keyboard = KeyboardController()
         print(f"ini{title}")
         self.DATA_DIR = 'data'
         import secret_masterpassword
@@ -79,7 +82,6 @@ class TyperApp():
     
     
     def type(self,filename,noauth=False):
-        # pyautogui.write(self.read(filename),interval=0.05)
         i = 0
         dt = self.read(filename,safer=True,noauth=noauth)
         if not dt:
@@ -90,20 +92,25 @@ class TyperApp():
                 dt = totp.now("".join(chr(c) for c in dt),on_linux=True) #get the TOTP
                 dt = [ord(c) for c in dt] #make it array of ord again
             while (i<len(dt)):
-                # time.sleep(0.02)
+                time.sleep(0.05)
                 c = chr(dt[i])
                 # print(c)
                 try:
                     if c=='\\' and chr(dt[i+1])=='n':
-                        pyautogui.press('enter')
+                        # pyautogui.press('enter')
+                        self.keyboard.press(KeyboardKey.enter)
+                        self.keyboard.release(KeyboardKey.enter)
                     elif c=='\\' and chr(dt[i+1])=='t':
-                        pyautogui.press('tab')
+                        # pyautogui.press('tab')
+                        self.keyboard.press(KeyboardKey.tab)
+                        self.keyboard.release(KeyboardKey.tab)
                     else:
                         raise Exception()
                     i += 2
                     continue
                 except:pass
-                pyautogui.write(c)
+                # pyautogui.write(c)
+                self.keyboard.type(c)
                 i += 1
         finally:
             self.led(False)
@@ -142,5 +149,4 @@ def typer_type(filename):
 if __name__=="__main__":
     # app = TyperApp()
     typerapp = TyperApp()
-    # pyautogui.write(app.read('bismillah').decode('utf8'),interval=0.05)
     app.run(debug=True)
