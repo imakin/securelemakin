@@ -79,7 +79,7 @@ void setup(){
 
     keyboard.begin();
 
-    Wire.begin(100,sda_pin,scl_pin,100000);//address=100 as slave, leonardo (D2 SDA), (D3 SCL). on esp: (D2 GPIO4 SDA) (D1 GPIO5 SCL)
+    Wire.begin(100,sda_pin,scl_pin,100000);//address=100 as slave,
     cmd.clear();
     Wire.onReceive(wireOnReceive);
     Wire.onRequest(wireOnRequest);
@@ -157,8 +157,16 @@ void wireOnReceive(int received_length){
         if (keyboardmode) {
             digitalWrite(ledpin,HIGH);
             if (is_printable(c)){
+                if (c<97 || c>122) {
+                    delay(100);
+                }
                 keyboard.sendChar(c);
-                delay(25);
+                if (c<97 || c>122) {
+                    delay(50);
+                }
+                else {
+                    delay(25);
+                }
             }
             else {
                 //non printable ascii data

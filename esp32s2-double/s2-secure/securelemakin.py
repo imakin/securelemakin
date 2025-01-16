@@ -177,14 +177,27 @@ class CommandManager(object):
         print(s)
         s = s.replace(r'\t','\t') #support escape sequence only for \t and \n
         s = s.replace(r'\n','\n')
+        s = s.replace(r'\a','\a') #alert char is used for delay. if data is imdelaying\a4delay4s it will print imdelaying then delay 4s, then print delay4s
         if output_mode:
             return s
         keyboard.on()
         while len(s)>0:
             #dont forget our i2c cant send more than 42 bytes at once
-            self.ctx.i2c.writeto(self.ctx.address,s[:32].encode('utf8'))
-            s = s[32:]
-            time_sleep(1)
+            towrite = s[:32]
+            next_towrite = s[32:]
+            alertchar = towrite.find('\a')
+            delaytime = 1 #by default it delays 1s between 32 charracter, but if \a exist, it will delay by defined number between \a
+            try:
+                if (alertchar>0):
+                    delaytime = int(towrite[alertchar+1])
+                    towrite = s[:alertchar]
+                    next_towrite = s[alertchar+2:] #skip \a and delaytime
+            except (IndexError,ValueError):
+                pass
+
+            self.ctx.i2c.writeto(self.ctx.address,towrite.encode('utf8'))
+            s = next_towrite
+            time_sleep(delaytime)
         keyboard.off()#s2-keyboard only check pin on the begining of i2c data, so it's safe to off() while s2-keyboard is still receiving
         # ~ time_sleep(0.5)
         self.ctx.i2c.stop()
@@ -225,7 +238,7 @@ class CommandManager(object):
         s = enc.bytearray_strip(
             enc.decrypt(b,self.password.get())
         )
-        pin = totp.now(s)
+        pin = totp.now(s,logger=ngeprint)
         if output_mode:
             return pin
         keyboard.on()
@@ -275,6 +288,13 @@ class CommandManager(object):
             pass
 
     def button_mode(self,message):
+        """
+        @param message:
+            BB,BA,down,up,left,right,enter,backspace,esc
+            from def btval()
+        @return:
+            None
+        """
         self.button_mode_timer = time_time()
         display.lock.locked = True
         ngeprint(f"buttonmode: {message}")
@@ -316,14 +336,14 @@ class CommandManager(object):
         except Exception as e:
             ngeprint(f"error {e}  {self.data_pos} {self.data_keys} ")
 
-    """
-    data_message examples:
-        "cmd_print securedata_name_secret"
-        "cmd_otp mygmail"
-        "cmd_password mypassword"
-    first word is method in this class
-    """
     def process(self,data_message):
+        """
+        data_message is format [commmand][space][data key]. examples:
+            "cmd_print securedata_name_secret"
+            "cmd_otp mygmail"
+            "cmd_password mypassword"
+        first word is method in this class
+        """
         if display.lock.locked and time_time()-self.button_mode_timer>5:
             display.lock.locked = False
         

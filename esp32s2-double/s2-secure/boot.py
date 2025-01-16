@@ -16,9 +16,9 @@ class __ANY:
 __any = __ANY()
 ls = __any.ls
 
-import wificonnect
+# import wificonnect
 
-expected_lib = ['base64.mpy', 'binascii.mpy', 'hmac.mpy', 'struct.mpy']
+expected_lib = ['base64.mpy', 'binascii.mpy', 'hmac.mpy']
 
 try:
     assert(listdir('/lib')==expected_lib)

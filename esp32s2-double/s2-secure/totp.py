@@ -7,7 +7,12 @@ except:
     #non esp
     def ntptime_settime():pass
     from time import gmtime
-from time import mktime,localtime
+from time import mktime
+try:
+    from rtc import rtc_localtime
+except:
+    from time import localtime
+    rtc_localtime = localtime
 import gc
 
 gc.collect()
@@ -89,9 +94,14 @@ def epoch_2000_to_1970(s):
     return s+946_684_800
     
 
-def now(secretcode, on_linux=False):
+def now(secretcode, on_linux=False, logger=None):
     aku = OTP(secretcode)
-    ntptime_settime()
+    # try:
+    #     ntptime_settime()
+    # except:
+    #     if logger:
+    #         logger(f"ntp set err, curr: {localtime()}")
+    #no longer using ntp
     if on_linux:
         hasil = aku.generate_otp(
             int(
@@ -102,7 +112,7 @@ def now(secretcode, on_linux=False):
     else:
         hasil =  aku.generate_otp(
             int(
-                epoch_2000_to_1970(mktime(localtime()))
+                epoch_2000_to_1970(mktime(rtc_localtime()))
                 //30 #TOTP timestep
             )
         )

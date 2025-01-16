@@ -1,7 +1,7 @@
 import os
 import requests
 
-r = requests.get('http://127.0.0.1:5000/list')
+r = requests.get('http://127.0.0.1:5000/list/')
 files = r.text.split('\n')
 print(files)
 

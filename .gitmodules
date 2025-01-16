@@ -1,0 +1,6 @@
+[submodule "hasdhuahdsuhasduhwuijfnsakjnjkxwoij"]
+        path = reusable/NTPClient
+        url = git@github.com:arduino-libraries/NTPClient.git
+[submodule "esp32s2-double/s2-keyboard2/esp32-usb-v2"]
+	path = reusable/esp32-usb-v2
+	url = https://github.com/chegewara/esp32-usb-v2.git
