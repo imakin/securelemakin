@@ -14,9 +14,18 @@ from flask.views import View
 
 from multiprocessing import Process,Value, Array
 
+
+BASEDIR = os.path.dirname(os.path.abspath(__file__))
+os.chdir(BASEDIR)
+
 sys.path.append('../reusable')
+import enc3
+import enc2
 import enc
 import totp
+
+
+DATA_DIR = '../data-manager/data-enc3'
 
 app = Flask(__name__)
 
@@ -32,19 +41,21 @@ class IdleChecker(Process):
             subprocess.check_call(['gsettings','set','com.izzulmakin.gnomemakindisplay','panel-text',f'"{message}"'])
         except Exception as e:
             print(e)
-            e.print_exc()
+            # e.print_exc()
     
     def run(self):
         while True:
-            time.sleep(-1+self.MAX_IDLE_TIME//2)
-            # time.sleep(3)
-            idle_time_ms = int(subprocess.check_output(['xprintidle']).strip())
-            if idle_time_ms > self.MAX_IDLE_TIME*1000:
+            try:
+                time.sleep(-1+self.MAX_IDLE_TIME//2)
+                # time.sleep(3)
+                idle_time_ms = int(subprocess.check_output(['xprintidle']).strip())
+                if idle_time_ms > self.MAX_IDLE_TIME*1000:
+                    self.flag_should_auth.value = True
+                else:
+                    self.flag_should_auth.value = False
+                self.alert(f'idle time {idle_time_ms//1000}')
+            except:
                 self.flag_should_auth.value = True
-            else:
-                self.flag_should_auth.value = False
-            self.alert(f'idle time {idle_time_ms//1000}')
-
 
 
 class TyperApp():
@@ -52,9 +63,8 @@ class TyperApp():
     def __init__(self,title="server"):
         self.keyboard = KeyboardController()
         print(f"ini{title}")
-        self.DATA_DIR = 'data'
         import secret_masterpassword
-        self.pw = secret_masterpassword.get_pw(enc,title=title)
+        self.pw = secret_masterpassword.get_pw(enc3,title=title)
         self.last_message = ""
 
         self.flag_should_auth = Value('b',True)
@@ -86,7 +96,7 @@ class TyperApp():
                 self.last_message = message
         except Exception as e:
             print(e)
-            e.print_exc()
+            # e.print_exc()
     
     
     def auth(self, title=''):
@@ -119,6 +129,17 @@ class TyperApp():
                     d = 'err'
                 self.alert(f'auth failed {title} {d}')
                 pass
+        
+        #if still failed
+        print(f'still failed, try fingerprint')
+        tries = 5
+        while tries>0:
+            try:
+                d = subprocess.check_output(['fprintd-verify'])
+                return True
+            except:
+                self.alert(f'fprintd-verify error {tries}')
+            tries -= 1
 
         return False
 
@@ -127,9 +148,9 @@ class TyperApp():
         if not(noauth or self.auth(f'for {filename}')): #equivalent not(noauth) and not(self.auth())
             # self.alert('securelemakin auth error')
             return False
-        with open(os.path.join(self.DATA_DIR, filename), 'rb') as f:
+        with open(os.path.join(DATA_DIR, filename), 'rb') as f:
             cipher = bytearray(f.read())
-            m = enc.decrypt(cipher, self.pw)
+            m = enc3.decrypt(cipher, self.pw)
             if safer:#return as array of utf8 integer
                 return [number for number in (m.strip(b'\0'))]
             return (m.strip(b'\0')).decode('utf8')
@@ -137,8 +158,12 @@ class TyperApp():
     
     
     def type(self,filename,noauth=False):
+        print(f'os env {os.environ["DISPLAY"]}')
         i = 0
-        dt = self.read(filename,safer=True,noauth=noauth)
+        try:
+            dt = self.read(filename,safer=True,noauth=noauth)
+        except FileNotFoundError:
+            print(f"error. cwd: {os.getcwd()}. file {filename} not found in {DATA_DIR}")
         if not dt:
             return
         try:
@@ -170,10 +195,14 @@ class TyperApp():
                         raise Exception()
                     i += 2
                     continue
-                except:pass
+                except Exception as e:
+                    pass
                 # pyautogui.write(c)
                 self.keyboard.type(c)
                 i += 1
+        except Exception as e:
+            print(f'os env {os.environ['DISPLAY']}')
+            print(f'ada error: {e}')
         finally:
             self.led(False)
 
@@ -182,7 +211,7 @@ typerapp = None
 @app.route('/')
 @app.route('/<path:filter>')
 def file_list(filter=""):
-    files = os.listdir('./data')
+    files = os.listdir(DATA_DIR)
     files.sort()
     return render_template('file_list_template.html', model={
         "files":files,
@@ -191,7 +220,7 @@ def file_list(filter=""):
 
 @app.route('/list/')
 def file_list_raw():
-    files = os.listdir('./data')
+    files = os.listdir(DATA_DIR)
     files.sort()
     return Response(
         "\n".join(files)

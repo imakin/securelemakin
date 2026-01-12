@@ -37,7 +37,10 @@ for f in files:
 				print(f"done making {newfilename}, deleting {f}")
 				os.unlink(f)
 				f = newfilename
-	cmd = f"pyboard.py --no-soft-reset -d {device} -f cp {f} :{ESP_DIR}/{f}"
+	cmd = f"python ../../reusable/pyboard.py --no-soft-reset -d {device} -f cp {f} :{ESP_DIR}/{f}"
 	print(cmd)
-	subprocess.check_output(cmd,shell=True)
+	try:
+		subprocess.check_output(cmd,shell=True)
+	except:
+		print("warning: not uploading, encrypt only")
 	

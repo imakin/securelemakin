@@ -7,7 +7,7 @@ import gc
 
 import totp
 gc.collect()
-import enc
+import enc3 as enc
 import secret
 print(gc.mem_free())
 gc.collect()
@@ -177,7 +177,7 @@ class CommandManager(object):
         print(s)
         s = s.replace(r'\t','\t') #support escape sequence only for \t and \n
         s = s.replace(r'\n','\n')
-        s = s.replace(r'\a','\a') #alert char is used for delay. if data is imdelaying\a4delay4s it will print imdelaying then delay 4s, then print delay4s
+        s = s.replace(r'\a','\a') #alert char is used for delay. if data is 'imdelaying\a4delay4s' it will print 'imdelaying' then delay 4s, then print 'delay4s'
         if output_mode:
             return s
         keyboard.on()
