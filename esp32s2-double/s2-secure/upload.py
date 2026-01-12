@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-#requirement: pyserial, python-minifier
+#requirement: pyserial, python-minifier, mpy-cross
 
 import os
 import subprocess
